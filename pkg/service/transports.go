@@ -1,9 +1,9 @@
 package service
 
 /*
-	File: transports.go
-	Last Updated: January 23, 2020
-	Updated by: Manuel Poppe Richter
+	File:    transports.go
+	Date:    January 23, 2020
+	Author:  Manuel Poppe Richter
 	Purpose: Defines the accepted http requests and responses for our web service
 */
 

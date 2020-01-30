@@ -1,9 +1,9 @@
 package service
 
 /*
-	File:  server.go
-	Last Updated: January 23, 2020
-	Updated by: Manuel Poppe Richter
+	File:    server.go
+	Date:    January 23, 2020
+	Author:  Manuel Poppe Richter
 	Purpose: Creates a custom server interface that has the methods for our specific server on it
 	Most of this code is unchanged from https://dev.to/napolux/how-to-write-a-microservice-in-go-with-go-kit-a66
 */

@@ -1,10 +1,10 @@
 package service
 
 /*
-	File: endpoints.go
-	Last Updated: January 23, 2020
-	Updated by: Manuel Poppe Richter
-	Purpose: exposes the endpoints that our web service will have,
+	File:    endpoints.go
+	Date:    January 23, 2020
+	Author:  Manuel Poppe Richter
+	Purpose: Exposes the endpoints that our web service will have,
 */
 
 import (

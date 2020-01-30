@@ -1,9 +1,9 @@
 package service
 
 /*
-	File: infrastructure.go
-	Last Updated: January 23, 2020
-	Updated by: Manuel Poppe Richter
+	File:    infrastructure.go
+	Date:    January 23, 2020
+	Author:  Manuel Poppe Richter
 	Purpose: Defines the interface, functions and parameters for our web service
 */
 
