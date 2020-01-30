@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/msgurgel/marathon/pkg/service"
+	"github.com/sirupsen/logrus"
 	"log"
 	"net/http"
 	"os"
@@ -21,14 +22,18 @@ import (
 )
 
 func main() {
+	logger := setupLogger()
+
 	var (
 		httpAddr = flag.String("http", ":8080", "http listen address")
 	)
 	flag.Parse()
 	ctx := context.Background()
 
-	// creating instance of the service
-	srv := service.MarathonWebService{}
+	// creating instance of the service, with logging middleware
+	var srv service.MarathonService
+	srv = service.MarathonWebService{}
+	srv = service.LoggingMiddleware{Logger: logger, Next: srv}
 	errChan := make(chan error)
 
 	go func() {
@@ -51,4 +56,26 @@ func main() {
 	}()
 
 	log.Fatalln(<-errChan)
+}
+
+// setupLogger configures the logrus logger
+func setupLogger() *logrus.Logger {
+    logger := logrus.New()
+
+    // Create file to store logs
+	file, err := os.OpenFile("runtime.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err == nil {
+		logger.Out = file
+	} else {
+		logger.Info("Failed to log to file, using default stderr")
+	}
+
+	// Log formatting
+	logger.SetFormatter(&logrus.TextFormatter{
+		ForceColors:   true,
+		FullTimestamp: true,
+	})
+	logger.SetLevel(logrus.DebugLevel)
+
+	return logger
 }
