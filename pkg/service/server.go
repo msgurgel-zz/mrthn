@@ -23,7 +23,7 @@ func NewHTTPServer(ctx context.Context, endpoints Endpoints) http.Handler {
 
 	r.Methods("POST").Path("/GetCalories").Handler(httptransport.NewServer(
 		endpoints.GetCaloriesEndpoint,
-		DecodeGetCaloriestRequest,
+		DecodeGetCaloriesRequest,
 		EncodeResponse,
 	))
 

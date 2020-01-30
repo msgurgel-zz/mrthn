@@ -14,7 +14,6 @@ import (
 )
 
 // the requests and responses for the GetCalories function
-
 type GetCaloriesRequest struct {
 	UserId int `json:"userId"`
 }
@@ -38,7 +37,7 @@ type GetStepsResponse struct {
 // TODO: These functions look very similar, can probably abstract it into one function? This will probably be more useful the more functions we create
 
 // DecodeGetCaloriesRequest returns the request structure for a GetCalories request, or an error if the proper arguments weren't sent
-func DecodeGetCaloriestRequest(ctx context.Context, r *http.Request) (interface{}, error) {
+func DecodeGetCaloriesRequest(ctx context.Context, r *http.Request) (interface{}, error) {
 	var req GetCaloriesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
