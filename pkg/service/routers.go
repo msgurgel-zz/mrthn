@@ -63,6 +63,7 @@ func prepareRoutes(logger *logrus.Logger, secret string) Routes {
 	api := Api{}
 	api.logger = logger
 	api.signingKey = []byte(secret)
+	api.authMethods.Init()
 
 	routes := Routes{
 		Route{
@@ -95,6 +96,22 @@ func prepareRoutes(logger *logrus.Logger, secret string) Routes {
 			"/user/{userID}/steps",
 			true,
 			api.GetUserSteps,
+		},
+
+		Route{
+			"Login",
+			"GET",
+			"/login",
+			false,
+			api.Login,
+		},
+
+		Route{
+			"Callback",
+			"GET",
+			"/callback",
+			false,
+			api.Callback,
 		},
 	}
 
