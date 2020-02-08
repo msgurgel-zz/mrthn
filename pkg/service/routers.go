@@ -10,6 +10,8 @@ package service
 import (
 	"net/http"
 
+	"github.com/msgurgel/marathon/pkg/environment"
+
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
@@ -26,8 +28,8 @@ type Route struct {
 
 type Routes []Route
 
-func NewRouter(logger *logrus.Logger, secret string) *mux.Router {
-	routes := prepareRoutes(logger, secret)
+func NewRouter(logger *logrus.Logger, secret string, configs *environment.MarathonConfig) *mux.Router {
+	routes := prepareRoutes(logger, secret, configs)
 	router := mux.NewRouter().StrictSlash(true)
 
 	// Setup JWT middleware for secure endpoints
@@ -59,11 +61,11 @@ func NewRouter(logger *logrus.Logger, secret string) *mux.Router {
 	return router
 }
 
-func prepareRoutes(logger *logrus.Logger, secret string) Routes {
+func prepareRoutes(logger *logrus.Logger, secret string, configs *environment.MarathonConfig) Routes {
 	api := Api{}
 	api.logger = logger
 	api.signingKey = []byte(secret)
-	api.authMethods.Init()
+	api.authMethods.Init(configs)
 
 	routes := Routes{
 		Route{

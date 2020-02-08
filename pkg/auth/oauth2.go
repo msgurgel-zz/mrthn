@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/environment"
+
+	"golang.org/x/oauth2/endpoints"
+
 	"golang.org/x/oauth2"
 )
 
@@ -30,11 +34,17 @@ type StateKeys struct {
 	Callback string
 }
 
-func initializeOAuth2Map() map[string]*oauth2.Config {
+func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
 	OauthConfigs := make(map[string]*oauth2.Config)
 
 	// Initialize all platforms OAuth2 configs
-	OauthConfigs["fitbit"] = GetFitbitOauth2Config()
+	OauthConfigs["fitbit"] = &oauth2.Config{
+		RedirectURL:  configs.Callback,
+		ClientID:     configs.FitBit.ClientID,
+		ClientSecret: configs.FitBit.ClientSecret,
+		Scopes:       []string{"activity", "profile", "settings", "heartrate"},
+		Endpoint:     endpoints.Fitbit,
+	}
 
 	return OauthConfigs
 }
@@ -53,14 +63,14 @@ func createStateString(service string) string {
 	return base64.StdEncoding.EncodeToString(stateString)
 }
 
-func NewOAuth2() Oauth2 {
+func NewOAuth2(configs *environment.MarathonConfig) Oauth2 {
 	requestClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
 	return Oauth2{
 		RequestClient: requestClient,
-		OauthConfigs:  initializeOAuth2Map(),
+		OauthConfigs:  initializeOAuth2Map(configs),
 		CurrentStates: make(map[string]StateKeys),
 	}
 }
@@ -87,7 +97,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (string, string,
 		switch ReturnedState.Service {
 		case "fitbit":
 			// exchange the code received for an access and refresh token
-			token, err := GetFitbitOauth2Config().Exchange(context.Background(), code)
+			token, err := o.OauthConfigs["fitbit"].Exchange(context.Background(), code)
 			if err != nil {
 				// something went wrong
 				return "", "", ReturnedState.Callback, err
