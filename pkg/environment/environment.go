@@ -11,9 +11,10 @@ import (
 
 // the overall structure that will contain our environment configs for the marathon service
 type MarathonConfig struct {
-	Server   serverConfig
-	FitBit   serviceConfig
-	Callback string // this will be the callback for all services. If we need multiple, this may need to change
+	Server        serverConfig
+	FitBit        platformConfig
+	Callback      string        // this will be the callback for all services. If we need multiple, this may need to change
+	ClientTimeout time.Duration // the timeout for the client that is used to make requests for Marathon
 }
 
 // server config options
@@ -25,45 +26,52 @@ type serverConfig struct {
 }
 
 // Config struct specifically for Fitbit client ids, secrets, etc
-type serviceConfig struct {
+type platformConfig struct {
 	ClientID     string
 	ClientSecret string
 }
 
 // InitializeEnvironmentConfig takes the environment variables, and puts them all into an EnvironmentConfig struct
-func InitializeEnvironmentConfig() (MarathonConfig, error) {
+func ReadEnvFile() (*MarathonConfig, error) {
 	// create the Environment Config struct we will return to the user
 	setConfig := MarathonConfig{}
 
 	// get the environment variables
 	err := godotenv.Load()
 	if err != nil {
-		return setConfig, err
+		return &setConfig, err
 	} else {
 
 		// get the callback for all services
 		callbackUrl, KeyExists := os.LookupEnv("CALLBACK")
 		if !KeyExists {
-			return setConfig, errors.New("environment variable [CALLBACK] does not exist")
-			return setConfig, err
+			return &setConfig, errors.New("environment variable [CALLBACK] does not exist")
 		} else {
 			setConfig.Callback = callbackUrl
+		}
+
+		// get the client timeout
+		clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))
+		if err != nil {
+			return &setConfig, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
+		} else {
+			setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
 		}
 
 		// start parsing the environment variables
 		readTime, err := strconv.Atoi(os.Getenv("READ_TIMEOUT"))
 		if err != nil {
-			return setConfig, err
+			return &setConfig, err
 		} // is there a better way to handle these?
 
 		writeTime, err := strconv.Atoi(os.Getenv("WRITE_TIMEOUT"))
 		if err != nil {
-			return setConfig, err
+			return &setConfig, err
 		}
 
 		idleTime, err := strconv.Atoi(os.Getenv("IDLE_TIMEOUT"))
 		if err != nil {
-			return setConfig, err
+			return &setConfig, err
 		}
 
 		srv := serverConfig{
@@ -77,22 +85,22 @@ func InitializeEnvironmentConfig() (MarathonConfig, error) {
 
 		// get the configs for the services
 
-		FitBitConfig, err := AddServiceConfig("FITBIT")
+		FitBitConfig, err := AddPlatformConfig("FITBIT")
 
 		if err != nil {
-			return setConfig, err
+			return &setConfig, err
 		} else {
 			setConfig.FitBit = FitBitConfig
 		}
 
-		return setConfig, nil
+		return &setConfig, nil
 
 	}
 }
 
-func AddServiceConfig(service string) (serviceConfig, error) {
-	// create the serviceConfig we will return back
-	newService := serviceConfig{}
+func AddPlatformConfig(service string) (platformConfig, error) {
+	// create the platformConfig we will return back
+	newService := platformConfig{}
 
 	secretKey := "CLIENT_SECRET_" + service
 	clientIdKey := "CLIENT_ID_" + service

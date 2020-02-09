@@ -34,20 +34,20 @@ func main() {
 	log.Info("Server started")
 
 	// get the environment variables
-	EnvironmentSettings, err := environment.InitializeEnvironmentConfig()
+	env, err := environment.ReadEnvFile()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	router := service.NewRouter(log, "secret", &EnvironmentSettings)
+	router := service.NewRouter(log, "secret", env)
 
 	srv := &http.Server{
-		Addr:         EnvironmentSettings.Server.Address,
+		Addr:         env.Server.Address,
 		Handler:      router,
-		ReadTimeout:  EnvironmentSettings.Server.ReadTimeOut,
-		WriteTimeout: EnvironmentSettings.Server.IdleTimeout,
-		IdleTimeout:  EnvironmentSettings.Server.IdleTimeout,
+		ReadTimeout:  env.Server.ReadTimeOut,
+		WriteTimeout: env.Server.IdleTimeout,
+		IdleTimeout:  env.Server.IdleTimeout,
 	}
 
 	// Run server in a goroutine so that it doesn't block
