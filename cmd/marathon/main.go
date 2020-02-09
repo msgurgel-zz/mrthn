@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/environment"
+
 	"github.com/msgurgel/marathon/pkg/service"
 )
 
@@ -31,14 +33,21 @@ func main() {
 	log := service.SetupLogger()
 	log.Info("Server started")
 
-	router := service.NewRouter(log, "secret")
+	// get the environment variables
+	env, err := environment.ReadEnvFile()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router := service.NewRouter(log, "secret", env)
 
 	srv := &http.Server{
-		Addr:         "0.0.0.0:8080",
+		Addr:         env.Server.Address,
 		Handler:      router,
-		ReadTimeout:  time.Second * 15,
-		WriteTimeout: time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		ReadTimeout:  env.Server.ReadTimeOut,
+		WriteTimeout: env.Server.IdleTimeout,
+		IdleTimeout:  env.Server.IdleTimeout,
 	}
 
 	// Run server in a goroutine so that it doesn't block
