@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/msgurgel/marathon/pkg/environment"
 
 	"github.com/msgurgel/marathon/pkg/service"
@@ -31,16 +33,24 @@ func main() {
 	flag.Parse()
 
 	log := service.SetupLogger()
-	log.Info("Server started")
 
 	// get the environment variables
 	env, err := environment.ReadEnvFile()
-
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("failed to read .env file. Exiting...")
 	}
 
-	router := service.NewRouter(log, "secret", env)
+	// Connect to database using configuration struct
+	db, err := service.InitializeDBConn(env)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("failed to connect to database. Exiting...")
+	}
+
+	router := service.NewRouter(db, log, env)
 
 	srv := &http.Server{
 		Addr:         env.Server.Address,
@@ -56,6 +66,10 @@ func main() {
 			log.Info(err)
 		}
 	}()
+
+	log.WithFields(logrus.Fields{
+		"addr": env.Server.Address,
+	}).Info("Server started")
 
 	c := make(chan os.Signal, 1)
 

@@ -9,27 +9,38 @@ package service
 
 import (
 	"bytes"
+	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/msgurgel/marathon/pkg/auth"
+	"github.com/msgurgel/marathon/pkg/environment"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/mux"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/msgurgel/marathon/pkg/model"
 )
 
 type Api struct {
-	logger      *logrus.Logger
-	signingKey  []byte
+	log         *logrus.Logger
 	authMethods auth.Types
-	// The database conn obj will be here
+	db          *sql.DB
+}
+
+func NewApi(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) Api {
+	api := Api{
+		log: logger,
+		db:  db,
+	}
+	api.authMethods.Init(config)
+
+	return api
 }
 
 func (api *Api) Index(w http.ResponseWriter, r *http.Request) {
@@ -37,22 +48,53 @@ func (api *Api) Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
-	// Create the token
-	token := jwt.New(jwt.SigningMethodHS256)
+	// Get Client ID from request (check if clientID is in db)
+	idStr := r.FormValue("id")
+	clientId, err := strconv.Atoi(idStr)
 
-	// Create a map to store our claims
-	claims := token.Claims.(jwt.MapClaims)
+	// Generate random secret
+	secret := make([]byte, 64)
+	if _, err := io.ReadFull(rand.Reader, secret); err != nil {
+		api.log.WithFields(logrus.Fields{
+			"id":  clientId,
+			"err": err,
+		}).Error("failed to generate secret token")
 
-	// Set token claims
-	claims["admin"] = true
-	claims["name"] = "Ado Kukic"
-	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong. Try again later...")
+		return
+	}
 
-	// Sign the token with our secret
-	tokenString, _ := token.SignedString(api.signingKey)
+	// Store secret in the DB as part of the Client table
+	rows, err := InsertSecretInExistingClient(api.db, clientId, secret)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to update client with new generated secret")
 
-	// Finally, write the token to the browser window
-	w.Write([]byte(tokenString))
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong. Try again later...")
+		return
+	}
+
+	// Make sure that we updated the client with the new secret
+	if rows != 1 {
+		api.log.WithFields(logrus.Fields{
+			"clientId": clientId,
+		}).Warn("received /get-token request with invalid client ID")
+
+		respondWithError(w, http.StatusBadRequest, "client ID does not exist")
+		return
+	}
+
+	// Add client ID as part of the JWT claims
+	tokenString, _ := generateJWT(clientId, secret)
+
+	// Send the token back to the requestor
+	_, err = w.Write([]byte(tokenString))
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to send JWT")
+	}
 }
 
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
@@ -104,8 +146,9 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
-	// first thing first, check that the state returned was valid
-	AccessToken, RefreshToken, Callback, err := api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
+	// Check that the state returned was valid
+	AccessToken, RefreshToken, Callback, err :=
+		api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
 
 	if err == nil {
 
@@ -118,7 +161,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 		api.sendAuthorizationResult(jsonStr, Callback)
 
 	} else {
-		// something went wrong, instead of the result, send back the error
+		// Something went wrong, instead of the result, send back the error
 		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
 		api.sendAuthorizationResult(jsonStr, Callback)
 	}
@@ -129,13 +172,12 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	req, _ := http.NewRequest("POST", Callback, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	api.logger.Info("sending authorization result [" + string(body) + "] to [" + Callback + "]")
-
+	api.log.Info("sending authorization result [" + string(body) + "] to [" + Callback + "]")
 	callbackResponse, err := http.Post(Callback, "application/json", bytes.NewBuffer(body))
 
 	if err != nil {
 		// log the error
-		api.logger.Error(err)
+		api.log.Error(err)
 		return
 	}
 
