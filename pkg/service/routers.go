@@ -8,12 +8,11 @@
 package service
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/msgurgel/marathon/pkg/environment"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -28,17 +27,9 @@ type Route struct {
 
 type Routes []Route
 
-func NewRouter(logger *logrus.Logger, secret string, configs *environment.MarathonConfig) *mux.Router {
-	routes := prepareRoutes(logger, secret, configs)
+func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) *mux.Router {
+	routes := prepareRoutes(db, logger, config)
 	router := mux.NewRouter().StrictSlash(true)
-
-	// Setup JWT middleware for secure endpoints
-	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
-			return []byte(secret), nil
-		},
-		SigningMethod: jwt.SigningMethodHS256,
-	})
 
 	// Initialize routes
 	for _, route := range routes {
@@ -46,7 +37,7 @@ func NewRouter(logger *logrus.Logger, secret string, configs *environment.Marath
 		handler = route.HandlerFunc
 
 		if route.Secure {
-			handler = jwtMiddleware.Handler(handler)
+			handler = jwtMiddleware(db, logger, handler)
 		}
 
 		handler = Logger(logger, handler, route.Name)
@@ -61,11 +52,8 @@ func NewRouter(logger *logrus.Logger, secret string, configs *environment.Marath
 	return router
 }
 
-func prepareRoutes(logger *logrus.Logger, secret string, configs *environment.MarathonConfig) Routes {
-	api := Api{}
-	api.logger = logger
-	api.signingKey = []byte(secret)
-	api.authMethods.Init(configs)
+func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) Routes {
+	api := NewApi(db, logger, config)
 
 	routes := Routes{
 		Route{

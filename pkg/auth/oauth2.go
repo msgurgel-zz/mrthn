@@ -54,7 +54,7 @@ func createStateString(service string) string {
 
 	data := make([]byte, 30) // 30 characters should be a good random string
 	if _, err := io.ReadFull(rand.Reader, data); err != nil {
-		return ""
+		return "" // TODO: return an error here, log it and return an error for the end user
 	}
 
 	// add the service type to the front and the userID in the back

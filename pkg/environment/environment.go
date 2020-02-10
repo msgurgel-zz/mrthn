@@ -12,6 +12,7 @@ import (
 // the overall structure that will contain our environment configs for the marathon service
 type MarathonConfig struct {
 	Server        serverConfig
+	Database      databaseConfig
 	FitBit        platformConfig
 	Callback      string        // this will be the callback for all services. If we need multiple, this may need to change
 	ClientTimeout time.Duration // the timeout for the client that is used to make requests for Marathon
@@ -23,6 +24,14 @@ type serverConfig struct {
 	ReadTimeOut  time.Duration
 	WriteTimeOut time.Duration
 	IdleTimeout  time.Duration
+}
+
+type databaseConfig struct {
+	Host         string
+	Port         int
+	User         string
+	Password     string
+	DatabaseName string
 }
 
 // Config struct specifically for Fitbit client ids, secrets, etc
@@ -39,13 +48,13 @@ func ReadEnvFile() (*MarathonConfig, error) {
 	// get the environment variables
 	err := godotenv.Load()
 	if err != nil {
-		return &setConfig, err
+		return nil, err
 	} else {
 
 		// get the callback for all services
 		callbackUrl, KeyExists := os.LookupEnv("CALLBACK")
 		if !KeyExists {
-			return &setConfig, errors.New("environment variable [CALLBACK] does not exist")
+			return nil, errors.New("environment variable [CALLBACK] does not exist")
 		} else {
 			setConfig.Callback = callbackUrl
 		}
@@ -53,7 +62,7 @@ func ReadEnvFile() (*MarathonConfig, error) {
 		// get the client timeout
 		clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))
 		if err != nil {
-			return &setConfig, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
+			return nil, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
 		} else {
 			setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
 		}
@@ -61,17 +70,17 @@ func ReadEnvFile() (*MarathonConfig, error) {
 		// start parsing the environment variables
 		readTime, err := strconv.Atoi(os.Getenv("READ_TIMEOUT"))
 		if err != nil {
-			return &setConfig, err
-		} // is there a better way to handle these?
+			return nil, err
+		}
 
 		writeTime, err := strconv.Atoi(os.Getenv("WRITE_TIMEOUT"))
 		if err != nil {
-			return &setConfig, err
+			return nil, err
 		}
 
 		idleTime, err := strconv.Atoi(os.Getenv("IDLE_TIMEOUT"))
 		if err != nil {
-			return &setConfig, err
+			return nil, err
 		}
 
 		srv := serverConfig{
@@ -83,22 +92,38 @@ func ReadEnvFile() (*MarathonConfig, error) {
 
 		setConfig.Server = srv
 
+		// Database config parsing
+
+		port, err := strconv.Atoi(os.Getenv("DB_PORT"))
+		if err != nil {
+			return nil, err
+		}
+
+		db := databaseConfig{
+			Host:         os.Getenv("DB_HOST"),
+			Port:         port,
+			User:         os.Getenv("DB_USER"),
+			Password:     os.Getenv("DB_PASSWORD"),
+			DatabaseName: os.Getenv("DB_NAME"),
+		}
+
+		setConfig.Database = db
+
 		// get the configs for the services
 
-		FitBitConfig, err := AddPlatformConfig("FITBIT")
+		FitBitConfig, err := addPlatformConfig("FITBIT")
 
 		if err != nil {
-			return &setConfig, err
+			return nil, err
 		} else {
 			setConfig.FitBit = FitBitConfig
 		}
 
 		return &setConfig, nil
-
 	}
 }
 
-func AddPlatformConfig(service string) (platformConfig, error) {
+func addPlatformConfig(service string) (platformConfig, error) {
 	// create the platformConfig we will return back
 	newService := platformConfig{}
 
