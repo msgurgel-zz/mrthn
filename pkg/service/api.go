@@ -12,10 +12,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/context"
 
 	"github.com/msgurgel/marathon/pkg/auth"
 	"github.com/msgurgel/marathon/pkg/environment"
@@ -131,8 +134,12 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 	} else if !callbackOk || len(callBackURL) != 1 {
 		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
 	} else {
+
+		// get the client id
+		clientId := context.Get(r, "client_id").(int)
+
 		// create the state object
-		RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0])
+		RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
 
 		if ok == nil {
 			// check what type of request was made using the StateObject
@@ -147,23 +154,25 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 	// Check that the state returned was valid
-	AccessToken, RefreshToken, Callback, err :=
-		api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
+	Oauth2Result, err := api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
 
 	if err == nil {
 
-		// TODO: create a new user here into the database. For now, just print the access and refresh tokens
-		fmt.Println(AccessToken)
-		fmt.Println(RefreshToken)
+		userId, err := createUser(&Oauth2Result, api.db, api.log)
 
-		// Create the body for the callback
-		var jsonStr = []byte(`{"userId":"50"}`)
-		api.sendAuthorizationResult(jsonStr, Callback)
+		if err != nil {
+
+			var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
+			api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+		} else {
+			jsonStr := []byte(`{"userId":"` + string(userId) + `"}`)
+			api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+		}
 
 	} else {
 		// Something went wrong, instead of the result, send back the error
 		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
-		api.sendAuthorizationResult(jsonStr, Callback)
+		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
 	}
 
 }
@@ -182,6 +191,28 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	}
 
 	defer callbackResponse.Body.Close()
+}
+
+func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (int, error) {
+	// check what kind of service this user is being created for
+	switch OauthParams.Service {
+	case "fitbit":
+		// make the fitbit user and return the userId
+		userId, err := CreateFitbitUser(db, OauthParams.AccessToken, OauthParams.RefreshToken, OauthParams.ClientId)
+
+		if err != nil {
+
+			log.WithFields(logrus.Fields{
+				"err": err,
+			}).Error("failed to create a new fitbit user")
+			return 0, err
+		} else {
+			return userId, nil
+		}
+	default:
+		return 0, errors.New(OauthParams.Service + " service does not exist")
+	}
+
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {

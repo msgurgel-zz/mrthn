@@ -24,6 +24,14 @@ type Oauth2 struct {
 	CurrentStates map[string]StateKeys
 }
 
+type OAuthResult struct {
+	AccessToken  string
+	RefreshToken string
+	ClientId     int
+	Service      string
+	Callback     string
+}
+
 // When a user needs to request OAuth2 authorization, we need to save the important information in the state object
 // When the callback occurs, we compare the StateObject with the one that we got back
 type StateKeys struct {
@@ -32,6 +40,7 @@ type StateKeys struct {
 	State    []byte
 	URL      string
 	Callback string
+	ClientId int
 }
 
 func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
@@ -87,10 +96,11 @@ func (o *Oauth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 }
 
 // ObtainUserTokens checks if the inputted state exists. If so, it attempts to exchange the passed in code for the access and refresh tokens
-func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (string, string, string, error) {
+func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuthResult, error) {
 
 	// first things first, does this state actually exist?
 	ReturnedState, err := o.retrieveStateObject(stateKey)
+
 	if err == nil {
 		// This was an expected request.
 		// depending on what service was called, exchanging the code for the tokens may work slightly differently
@@ -100,22 +110,29 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (string, string,
 			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
 			if err != nil {
 				// something went wrong
-				return "", "", ReturnedState.Callback, err
+				return OAuthResult{}, err
 			} else {
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
-				return token.AccessToken, token.RefreshToken, ReturnedState.Callback, nil
+				return OAuthResult{
+					AccessToken:  token.AccessToken,
+					RefreshToken: token.RefreshToken,
+					ClientId:     ReturnedState.ClientId,
+					Service:      ReturnedState.Service,
+					Callback:     ReturnedState.Callback,
+				}, err
+
 			}
 		default:
-			return "", "", ReturnedState.Callback, errors.New(ReturnedState.Service + " service does not exist")
+			return OAuthResult{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Service + " service does not exist")
 		}
 	} else {
 		// this was an unexpected state
-		return "", "", ReturnedState.Callback, err
+		return OAuthResult{Callback: ReturnedState.Callback}, err
 	}
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *Oauth2) CreateStateObject(callbackURL string, service string) (StateKeys, error) {
+func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientId int) (StateKeys, error) {
 	ReturnedKeys := StateKeys{}
 
 	// check if the service actually exists
@@ -130,6 +147,7 @@ func (o *Oauth2) CreateStateObject(callbackURL string, service string) (StateKey
 		ReturnedKeys.State = []byte(stateString)
 		ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
 		ReturnedKeys.Callback = callbackURL
+		ReturnedKeys.ClientId = clientId
 
 		// Add this state to the state map
 		o.CurrentStates[string(ReturnedKeys.State)] = ReturnedKeys

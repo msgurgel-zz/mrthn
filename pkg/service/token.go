@@ -7,12 +7,18 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/context"
 	"github.com/sirupsen/logrus"
 )
 
 type marathonClaims struct {
 	ClientId int `json:"client_id"`
 	jwt.StandardClaims
+}
+
+type parseToken struct {
+	clientId int
+	valid    bool
 }
 
 func generateJWT(clientId int, secret []byte) (string, error) {
@@ -27,7 +33,7 @@ func generateJWT(clientId int, secret []byte) (string, error) {
 	return tokenString, nil
 }
 
-func validateJWT(db *sql.DB, tokenString string) (bool, error) {
+func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &marathonClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if claims, ok := token.Claims.(*marathonClaims); ok {
 			return GetClientSecret(db, claims.ClientId)
@@ -37,10 +43,19 @@ func validateJWT(db *sql.DB, tokenString string) (bool, error) {
 	})
 
 	if err != nil {
-		return false, err
+		return parseToken{valid: false}, err
 	}
 
-	return token.Valid, nil
+	if token.Valid {
+		claims, _ := token.Claims.(*marathonClaims)
+		return parseToken{
+			clientId: claims.ClientId,
+			valid:    true,
+		}, nil
+	}
+
+	return parseToken{valid: false}, nil
+
 }
 
 func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handler {
@@ -55,8 +70,9 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 			token = strings.TrimPrefix(token, "Bearer ")
 		}
 
-		valid, err := validateJWT(db, token)
-		if valid {
+		parseToken, err := validateJWT(db, token)
+		if parseToken.valid {
+			context.Set(r, "client_id", parseToken.clientId)
 			next.ServeHTTP(w, r)
 		} else {
 			log.WithFields(logrus.Fields{
