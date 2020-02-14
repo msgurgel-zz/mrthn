@@ -50,6 +50,8 @@ func main() {
 		}).Fatal("failed to connect to database. Exiting...")
 	}
 
+	defer db.Close()
+
 	router := service.NewRouter(db, log, env)
 
 	srv := &http.Server{

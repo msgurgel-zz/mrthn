@@ -1,9 +1,9 @@
 package service
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	_ "github.com/lib/pq"
 	"github.com/msgurgel/marathon/pkg/environment"
@@ -21,7 +21,7 @@ func InitializeDBConn(config *environment.MarathonConfig) (*sql.DB, error) {
 	}
 
 	// Test connection
-	err = db.PingContext(context.Background())
+	err = db.Ping()
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func InsertSecretInExistingClient(db *sql.DB, clientId int, secret []byte) (int6
 func GetClientSecret(db *sql.DB, fromClientId int) ([]byte, error) {
 	// TODO: Use QueryRowContext instead
 	var secret []byte
-	err := db.QueryRow("SELECT secret FROM client WHERE id = $1", fromClientId).Scan(&secret)
+	err := db.QueryRow("SELECT secret FROM client WHERE id = " + strconv.Itoa(fromClientId)).Scan(&secret)
 	if err != nil {
 		return nil, err
 	}
