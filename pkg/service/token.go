@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -11,22 +12,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type marathonClaims struct {
-	ClientId int `json:"client_id"`
-	jwt.StandardClaims
-}
-
 type parseToken struct {
 	clientId int
 	valid    bool
 }
 
 func generateJWT(clientId int, secret []byte) (string, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		// TODO: Make client ID not an integer
+		Audience: strconv.Itoa(clientId),
+	})
 
-	claims := token.Claims.(jwt.MapClaims)
-	claims["client_id"] = clientId
-	// claims["exp"] = time.Now().Add(time.Hour * 24).Unix() TODO: Add exp back
+	// TODO: Add expiration to the token
 
 	// Sign the token with the given secret
 	tokenString, _ := token.SignedString(secret)
@@ -34,9 +31,10 @@ func generateJWT(clientId int, secret []byte) (string, error) {
 }
 
 func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &marathonClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if claims, ok := token.Claims.(*marathonClaims); ok {
-			return GetClientSecret(db, claims.ClientId)
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if claims, ok := token.Claims.(*jwt.StandardClaims); ok {
+			clientId, _ := strconv.Atoi(claims.Audience)
+			return GetClientSecret(db, clientId)
 		} else {
 			return nil, errors.New("unable to parse JWT claims")
 		}
@@ -47,9 +45,10 @@ func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 	}
 
 	if token.Valid {
-		claims, _ := token.Claims.(*marathonClaims)
+		claims, _ := token.Claims.(*jwt.StandardClaims)
+		clientId, _ := strconv.Atoi(claims.Audience)
 		return parseToken{
-			clientId: claims.ClientId,
+			clientId: clientId,
 			valid:    true,
 		}, nil
 	}
