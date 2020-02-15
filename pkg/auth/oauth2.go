@@ -30,6 +30,7 @@ type OAuthResult struct {
 	ClientId     int
 	Service      string
 	Callback     string
+	PlatformId   string
 }
 
 // When a user needs to request OAuth2 authorization, we need to save the important information in the state object
@@ -108,10 +109,12 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuthResult, er
 		case "fitbit":
 			// exchange the code received for an access and refresh token
 			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
+
 			if err != nil {
 				// something went wrong
 				return OAuthResult{}, err
 			} else {
+
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
 				return OAuthResult{
 					AccessToken:  token.AccessToken,
@@ -119,6 +122,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuthResult, er
 					ClientId:     ReturnedState.ClientId,
 					Service:      ReturnedState.Service,
 					Callback:     ReturnedState.Callback,
+					PlatformId:   token.Extra("user_id").(string),
 				}, err
 
 			}

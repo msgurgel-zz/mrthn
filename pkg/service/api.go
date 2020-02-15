@@ -197,8 +197,22 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 	// check what kind of service this user is being created for
 	switch OauthParams.Service {
 	case "fitbit":
+
+		// before we create the user, check the id to see if its in the database
+
+		userId, err := CheckFitBitUser(db, OauthParams)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if userId != 0 {
+			// this user already exists, just return the userId
+			return userId, nil
+		}
+
 		// make the fitbit user and return the userId
-		userId, err := CreateFitbitUser(db, OauthParams.AccessToken, OauthParams.RefreshToken, OauthParams.ClientId)
+		userId, err = CreateFitbitUser(db, OauthParams)
 
 		if err != nil {
 
@@ -207,6 +221,9 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 			}).Error("failed to create a new fitbit user")
 			return 0, err
 		} else {
+			log.WithFields(logrus.Fields{
+				"userId": userId,
+			}).Info("new fitbit user created")
 			return userId, nil
 		}
 	default:
