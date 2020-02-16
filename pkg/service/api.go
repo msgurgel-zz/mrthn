@@ -144,33 +144,35 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
-
-	// check what login we actually want to authorize into
 	service, serviceOk := r.URL.Query()["service"]
 	callBackURL, callbackOk := r.URL.Query()["callback"]
 
 	if !serviceOk || len(service) != 1 {
-		// they didn't put the service code in properly
-		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
-	} else if !callbackOk || len(callBackURL) != 1 {
-		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
-	} else {
+		api.log.WithFields(logrus.Fields{
+			"func": "Login",
+		}).Error("missing URL param 'service'")
 
-		// get the client id
+		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
+		return
+	} else if !callbackOk || len(callBackURL) != 1 {
+		api.log.WithFields(logrus.Fields{
+			"func": "Login",
+		}).Error("missing URL param 'callback'")
+
+		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
+		return
+	} else {
+		// Get client ID from the context, set during the authentication phase
 		clientId := context.Get(r, "client_id").(int)
 
-		// create the state object
+		// Create the state object
 		RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
 
 		if ok == nil {
-			// check what type of request was made using the StateObject
-
-			// redirect with the stateObjects url
-			url := RequestStateObject.URL
-			http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+			url := RequestStateObject.URL                          // check what type of request was made using the StateObject
+			http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
 		}
 	}
-
 }
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
