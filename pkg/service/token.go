@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/msgurgel/marathon/pkg/dal"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/sirupsen/logrus"
@@ -34,7 +36,7 @@ func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if claims, ok := token.Claims.(*jwt.StandardClaims); ok {
 			clientId, _ := strconv.Atoi(claims.Audience)
-			return GetClientSecret(db, clientId)
+			return dal.GetClientSecret(db, clientId)
 		} else {
 			return nil, errors.New("unable to parse JWT claims")
 		}

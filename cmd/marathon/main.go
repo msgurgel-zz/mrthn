@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/dal"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/msgurgel/marathon/pkg/environment"
@@ -43,7 +45,13 @@ func main() {
 	}
 
 	// Connect to database using configuration struct
-	db, err := service.InitializeDBConn(env)
+	db, err := dal.InitializeDBConn(
+		env.Database.Host,
+		env.Database.Port,
+		env.Database.User,
+		env.Database.Password,
+		env.Database.DatabaseName,
+	)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err": err,

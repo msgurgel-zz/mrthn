@@ -1,4 +1,4 @@
-package service
+package dal
 
 import (
 	"database/sql"
@@ -8,13 +8,12 @@ import (
 	"github.com/msgurgel/marathon/pkg/auth"
 
 	_ "github.com/lib/pq"
-	"github.com/msgurgel/marathon/pkg/environment"
 )
 
-func InitializeDBConn(config *environment.MarathonConfig) (*sql.DB, error) {
+func InitializeDBConn(host string, port int, user, password, dbName string) (*sql.DB, error) {
 	connectionString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.Database.Host, config.Database.Port, config.Database.User, config.Database.Password, config.Database.DatabaseName,
+		host, port, user, password, dbName,
 	)
 
 	db, err := sql.Open("postgres", connectionString)
@@ -60,7 +59,7 @@ func GetClientSecret(db *sql.DB, fromClientId int) ([]byte, error) {
 	return secret, nil
 }
 
-func CheckFitBitUser(db *sql.DB, OauthParams *auth.OAuthResult) (int, error) {
+func CheckFitbitUser(db *sql.DB, OauthParams *auth.OAuthResult) (int, error) {
 	// query the database for the user we just authorized
 	var userId int
 
@@ -149,4 +148,41 @@ func CreateFitbitUser(db *sql.DB, oauth2Params *auth.OAuthResult) (int, error) {
 	}
 
 	return userId, err // err will be update by the deferred func
+}
+
+// TODO: Make it so auth type is not hardcoded in the SQL stmt
+func GetUserTokens(db *sql.DB, fromUserId int, platform string) (string, string, error) {
+	var accessToken, refreshToken string
+
+	stmt := fmt.Sprintf(
+		"SELECT o.access_token, o.refresh_token FROM oauth2 o JOIN %q p on o.id = p.oauth2_id WHERE user_id = %d",
+		platform,
+		fromUserId,
+	)
+
+	// TODO: Use QueryRowContext instead
+	err := db.QueryRow(stmt).Scan(&accessToken, &refreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func GetPlatformsString(db *sql.DB, fromUserId int) (string, error) {
+	// Get user's platforms
+	var platformsStr string
+
+	stmt := fmt.Sprintf(
+		`SELECT platforms FROM "user" WHERE id = %d`,
+		fromUserId,
+	)
+
+	// TODO: Use QueryRowContext instead
+	err := db.QueryRow(stmt).Scan(&platformsStr)
+	if err != nil {
+		return "", err
+	}
+
+	return platformsStr, nil
 }

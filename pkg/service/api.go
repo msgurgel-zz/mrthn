@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"github.com/msgurgel/marathon/pkg/dal"
 
 	"github.com/gorilla/context"
 
@@ -68,7 +69,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store secret in the DB as part of the Client table
-	rows, err := InsertSecretInExistingClient(api.db, clientId, secret)
+	rows, err := dal.InsertSecretInExistingClient(api.db, clientId, secret)
 	if err != nil {
 		api.log.WithFields(logrus.Fields{
 			"err": err,
@@ -193,6 +194,9 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	defer callbackResponse.Body.Close()
 }
 
+// Helpers Functions
+
+// TODO: move this somewhere else?
 func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (int, error) {
 	// check what kind of service this user is being created for
 	switch OauthParams.Service {
@@ -212,7 +216,7 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 		}
 
 		// make the fitbit user and return the userId
-		userId, err = CreateFitbitUser(db, OauthParams)
+		userId, err = dal.CreateFitbitUser(db, OauthParams)
 
 		if err != nil {
 
