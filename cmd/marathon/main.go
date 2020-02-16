@@ -17,6 +17,8 @@ import (
 
 	"github.com/msgurgel/marathon/pkg/dal"
 
+	"github.com/msgurgel/marathon/pkg/platform"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/msgurgel/marathon/pkg/environment"
@@ -59,6 +61,9 @@ func main() {
 	}
 
 	defer db.Close()
+
+	// Setup connections to platforms
+	platform.InitializePlatforms(db, log)
 
 	router := service.NewRouter(db, log, env)
 

@@ -7,14 +7,16 @@
  */
 package service
 
+import "github.com/msgurgel/marathon/pkg/model"
+
 type GetUserStepsResponse200 struct {
 	Id int `json:"id,omitempty"`
 
-	Steps int `json:"steps,omitempty"`
+	Steps []model.ValueResult `json:"steps,omitempty"`
 }
 
 type GetUserCaloriesResponse200 struct {
 	Id int `json:"id,omitempty"`
 
-	Calories int `json:"calories,omitempty"`
+	Calories []model.ValueResult `json:"steps,omitempty"`
 }

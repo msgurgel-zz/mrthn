@@ -17,6 +17,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
+
 	"github.com/msgurgel/marathon/pkg/dal"
 
 	"github.com/gorilla/context"
@@ -102,23 +104,41 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userId, _ := strconv.Atoi(vars["userID"]) // TODO: deal with error
+	userId, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+	}
+
+	caloriesValues, err := model.GetUserCalories(api.db, api.log, userId, date)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	response := GetUserCaloriesResponse200{
 		Id:       userId,
-		Calories: model.GetUserCalories(userId),
+		Calories: caloriesValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userId, _ := strconv.Atoi(vars["userID"]) // TODO: deal with error
+	userId, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+	}
+
+	stepsValues, err := model.GetUserSteps(api.db, api.log, userId, date)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	response := GetUserStepsResponse200{
 		Id:    userId,
-		Steps: model.GetUserSteps(userId),
+		Steps: stepsValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
@@ -234,6 +254,42 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 		return 0, errors.New(OauthParams.Service + " service does not exist")
 	}
 
+}
+
+// TODO: move this somewhere else?
+func parseISODate(dateStr string) (time.Time, error) {
+	date, err := time.Parse("2006-01-02", dateStr)
+
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return date, nil
+}
+
+func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId int, date time.Time, err error) {
+	// Get user from URL
+	vars := mux.Vars(r)
+	userId, _ = strconv.Atoi(vars["userID"]) // TODO: deal with error
+
+	// Get date from query params
+	dateStr, ok := r.URL.Query()["date"]
+	if !ok || len(dateStr) != 1 {
+		api.log.WithFields(fields).Error("missing URL param 'date'")
+
+		return 0, time.Time{}, errors.New("expected single 'date' parameter")
+	}
+
+	date, err = parseISODate(dateStr[0])
+	if err != nil {
+		fields["dateStr"] = dateStr
+		fields["err"] = err
+		api.log.WithFields(fields).Error("failed to parse date")
+
+		return 0, time.Time{}, errors.New("invalid date")
+	}
+
+	return userId, date, err
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
