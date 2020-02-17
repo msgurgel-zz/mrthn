@@ -76,7 +76,7 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 		} else {
 			log.WithFields(logrus.Fields{
 				"err": err,
-			}).Error("JWT token was invalid")
+			}).Error("JWT was invalid")
 
 			respondWithError(w, http.StatusUnauthorized, "invalid JWT token")
 		}
