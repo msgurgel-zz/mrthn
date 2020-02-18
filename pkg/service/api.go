@@ -17,6 +17,9 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/msgurgel/marathon/pkg/dal"
 
 	"github.com/gorilla/context"
 
@@ -68,7 +71,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store secret in the DB as part of the Client table
-	rows, err := InsertSecretInExistingClient(api.db, clientId, secret)
+	rows, err := dal.InsertSecretInExistingClient(api.db, clientId, secret)
 	if err != nil {
 		api.log.WithFields(logrus.Fields{
 			"err": err,
@@ -101,55 +104,75 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userId, _ := strconv.Atoi(vars["userID"]) // TODO: deal with error
+	userId, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+	}
+
+	caloriesValues, err := model.GetUserCalories(api.db, api.log, userId, date)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	response := GetUserCaloriesResponse200{
 		Id:       userId,
-		Calories: model.GetUserCalories(userId),
+		Calories: caloriesValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userId, _ := strconv.Atoi(vars["userID"]) // TODO: deal with error
+	userId, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+	}
+
+	stepsValues, err := model.GetUserSteps(api.db, api.log, userId, date)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	response := GetUserStepsResponse200{
 		Id:    userId,
-		Steps: model.GetUserSteps(userId),
+		Steps: stepsValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
-
-	// check what login we actually want to authorize into
 	service, serviceOk := r.URL.Query()["service"]
 	callBackURL, callbackOk := r.URL.Query()["callback"]
 
 	if !serviceOk || len(service) != 1 {
-		// they didn't put the service code in properly
-		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
-	} else if !callbackOk || len(callBackURL) != 1 {
-		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
-	} else {
+		api.log.WithFields(logrus.Fields{
+			"func": "Login",
+		}).Error("missing URL param 'service'")
 
-		// get the client id
+		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
+		return
+	} else if !callbackOk || len(callBackURL) != 1 {
+		api.log.WithFields(logrus.Fields{
+			"func": "Login",
+		}).Error("missing URL param 'callback'")
+
+		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
+		return
+	} else {
+		// Get client ID from the context, set during the authentication phase
 		clientId := context.Get(r, "client_id").(int)
 
-		// create the state object
+		// Create the state object
 		RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
 
 		if ok == nil {
-			// check what type of request was made using the StateObject
-
-			// redirect with the stateObjects url
-			url := RequestStateObject.URL
-			http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+			url := RequestStateObject.URL                          // check what type of request was made using the StateObject
+			http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
 		}
 	}
-
 }
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +216,9 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	defer callbackResponse.Body.Close()
 }
 
+// Helpers Functions
+
+// TODO: move this somewhere else?
 func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (int, error) {
 	// check what kind of service this user is being created for
 	switch OauthParams.Service {
@@ -212,7 +238,7 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 		}
 
 		// make the fitbit user and return the userId
-		userId, err = CreateFitbitUser(db, OauthParams)
+		userId, err = dal.CreateFitbitUser(db, OauthParams)
 
 		if err != nil {
 
@@ -230,6 +256,42 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 		return 0, errors.New(OauthParams.Service + " service does not exist")
 	}
 
+}
+
+// TODO: move this somewhere else?
+func parseISODate(dateStr string) (time.Time, error) {
+	date, err := time.Parse("2006-01-02", dateStr)
+
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return date, nil
+}
+
+func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId int, date time.Time, err error) {
+	// Get user from URL
+	vars := mux.Vars(r)
+	userId, _ = strconv.Atoi(vars["userID"]) // TODO: deal with error
+
+	// Get date from query params
+	dateStr, ok := r.URL.Query()["date"]
+	if !ok || len(dateStr) != 1 {
+		api.log.WithFields(fields).Error("missing URL param 'date'")
+
+		return 0, time.Time{}, errors.New("expected single 'date' parameter")
+	}
+
+	date, err = parseISODate(dateStr[0])
+	if err != nil {
+		fields["dateStr"] = dateStr
+		fields["err"] = err
+		api.log.WithFields(fields).Error("failed to parse date")
+
+		return 0, time.Time{}, errors.New("invalid date")
+	}
+
+	return userId, date, err
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {

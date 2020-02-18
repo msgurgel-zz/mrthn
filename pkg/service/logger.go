@@ -36,13 +36,13 @@ func SetupLogger() *logrus.Logger {
 	return logger
 }
 
-func Logger(logger *logrus.Logger, next http.Handler, name string) http.Handler {
+func Logger(log *logrus.Logger, next http.Handler, name string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		next.ServeHTTP(w, r)
 
-		logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"method": r.Method,
 			"uri":    r.RequestURI,
 			"func":   name,
