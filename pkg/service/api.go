@@ -219,14 +219,14 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 // Helpers Functions
 
 // TODO: move this somewhere else?
-func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (int, error) {
+func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
 	// check what kind of service this user is being created for
-	switch OauthParams.Service {
+	switch Oauth2Params.Platform {
 	case "fitbit":
 
 		// before we create the user, check the id to see if its in the database
 
-		userId, err := dal.CheckFitbitUser(db, OauthParams)
+		userId, err := dal.CheckUser(db, Oauth2Params.PlatformId, Oauth2Params.Platform)
 
 		if err != nil {
 			return 0, err
@@ -237,8 +237,16 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 			return userId, nil
 		}
 
+		// create the credentials for the user
+		var connectionParams = []string{"oauth2", Oauth2Params.AccessToken, Oauth2Params.RefreshToken}
+		userCredentials, err := dal.CreateUserCredentials(Oauth2Params.Platform, Oauth2Params.PlatformId, connectionParams)
+
+		if err != nil {
+			return 0, err
+		}
+
 		// make the fitbit user and return the userId
-		userId, err = dal.CreateFitbitUser(db, OauthParams)
+		userId, err = dal.InsertUserCredentials(db, &userCredentials, Oauth2Params.ClientId)
 
 		if err != nil {
 
@@ -253,7 +261,7 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 			return userId, nil
 		}
 	default:
-		return 0, errors.New(OauthParams.Service + " service does not exist")
+		return 0, errors.New(Oauth2Params.Platform + " service does not exist")
 	}
 
 }

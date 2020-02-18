@@ -4,11 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/msgurgel/marathon/pkg/auth"
+	"errors"
 
 	_ "github.com/lib/pq"
 )
+
+type UserCredentials struct {
+	PlatformName     string
+	PlatformId       string
+	ConnectionString string
+}
 
 func InitializeDBConn(host string, port int, user, password, dbName string) (*sql.DB, error) {
 	connectionString := fmt.Sprintf(
@@ -59,11 +66,12 @@ func GetClientSecret(db *sql.DB, fromClientId int) ([]byte, error) {
 	return secret, nil
 }
 
-func CheckFitbitUser(db *sql.DB, OauthParams *auth.OAuthResult) (int, error) {
+func CheckUser(db *sql.DB, platformId string, platformName string) (int, error) {
 	// query the database for the user we just authorized
 	var userId int
 
-	queryString := fmt.Sprintf("SELECT user_id FROM fitbit WHERE fitbit_id='%s'", OauthParams.PlatformId)
+	// check if this user exists in the credentials
+	queryString := fmt.Sprintf("SELECT user_id FROM credentials WHERE platform_id='%s' AND platform_name='%s'", platformId, platformName)
 
 	// the first thing we need to do is to create a new user in the user table
 	err := db.QueryRow(queryString).Scan(&userId)
@@ -85,7 +93,7 @@ func CheckFitbitUser(db *sql.DB, OauthParams *auth.OAuthResult) (int, error) {
 
 }
 
-func CreateFitbitUser(db *sql.DB, oauth2Params *auth.OAuthResult) (int, error) {
+func InsertUserCredentials(db *sql.DB, credentials *UserCredentials, clientId int) (int, error) {
 
 	// create a new transaction from the database connection
 	tx, err := db.Begin()
@@ -113,32 +121,18 @@ func CreateFitbitUser(db *sql.DB, oauth2Params *auth.OAuthResult) (int, error) {
 		return 0, err
 	}
 
-	// Now we need to do is create a new OAuth2 item in the database for fitbit
-	var oauthId int
-	// create query with the access and refresh tokens
-	// added  ' ' to the access ad refresh tokens because the periods in them seemed to be throwing postgresql off
-	insertParams := fmt.Sprintf("INSERT INTO oauth2 (access_token, refresh_token) VALUES ('%s','%s') RETURNING  id", oauth2Params.AccessToken, oauth2Params.RefreshToken)
-	err = tx.QueryRow(
-		insertParams,
-	).Scan(&oauthId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	// the result returned back should be an id that corresponds with the new ID of the Oauth2 id
-	// insert into the fitbit table
-	fitbitQuery := fmt.Sprintf("INSERT INTO fitbit (user_id, oauth2_id, fitbit_id) VALUES (%d,%d,'%s')", userId, oauthId, oauth2Params.PlatformId)
-
+	// add the user into the credentials table
+	credentialsQuery := fmt.Sprintf("INSERT INTO marathon.public.credentials (user_id, platform_name, platform_id, connection_string) VALUES (%d,'%s','%s','%s')", userId, credentials.PlatformName, credentials.PlatformId, credentials.ConnectionString)
 	_, err = tx.Exec(
-		fitbitQuery,
+		credentialsQuery,
 	)
+
 	if err != nil {
 		return 0, err
 	}
 
 	// the final step is to add the user to the appropriate row in the userbase table
-	userbaseQuery := fmt.Sprintf("INSERT INTO marathon.public.userbase (user_id, client_id) VALUES (%d,%d)", userId, oauth2Params.ClientId)
+	userbaseQuery := fmt.Sprintf("INSERT INTO marathon.public.userbase (user_id, client_id) VALUES (%d,%d)", userId, clientId)
 	_, err = tx.Exec(
 		userbaseQuery,
 	)
@@ -148,6 +142,28 @@ func CreateFitbitUser(db *sql.DB, oauth2Params *auth.OAuthResult) (int, error) {
 	}
 
 	return userId, err // err will be update by the deferred func
+}
+
+func CreateUserCredentials(platform string, platformID string, connectionParams []string) (UserCredentials, error) {
+
+	credentials := UserCredentials{
+		PlatformName: platform,
+		PlatformId:   platformID,
+	}
+
+	if len(connectionParams) == 0 {
+		return credentials, errors.New("must contain non zero amount of connection parameters")
+	}
+
+	var sb strings.Builder
+	for _, param := range connectionParams {
+		sb.WriteString(param + ";")
+	}
+
+	credentials.ConnectionString = sb.String()
+
+	return credentials, nil
+
 }
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
