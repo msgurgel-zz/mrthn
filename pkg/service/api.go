@@ -226,7 +226,7 @@ func createUser(OauthParams *auth.OAuthResult, db *sql.DB, log *logrus.Logger) (
 
 		// before we create the user, check the id to see if its in the database
 
-		userId, err := CheckFitBitUser(db, OauthParams)
+		userId, err := dal.CheckFitbitUser(db, OauthParams)
 
 		if err != nil {
 			return 0, err
