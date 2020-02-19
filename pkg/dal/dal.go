@@ -17,6 +17,11 @@ type UserCredentials struct {
 	ConnectionString string
 }
 
+type Connection struct {
+	ConnectionType string
+	Parameters     map[string]string
+}
+
 func InitializeDBConn(host string, port int, user, password, dbName string) (*sql.DB, error) {
 	connectionString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
@@ -28,7 +33,7 @@ func InitializeDBConn(host string, port int, user, password, dbName string) (*sq
 		return nil, err
 	}
 
-	// Test connection
+	// Test Connection
 	err = db.Ping()
 	if err != nil {
 		return nil, err
@@ -95,7 +100,7 @@ func CheckUser(db *sql.DB, platformId string, platformName string) (int, error) 
 
 func InsertUserCredentials(db *sql.DB, credentials *UserCredentials, clientId int) (int, error) {
 
-	// create a new transaction from the database connection
+	// create a new transaction from the database Connection
 	tx, err := db.Begin()
 
 	if err != nil {
@@ -152,7 +157,7 @@ func CreateUserCredentials(platform string, platformID string, connectionParams 
 	}
 
 	if len(connectionParams) == 0 {
-		return credentials, errors.New("must contain non zero amount of connection parameters")
+		return credentials, errors.New("must contain non zero amount of Connection parameters")
 	}
 
 	var sb strings.Builder
@@ -168,37 +173,99 @@ func CreateUserCredentials(platform string, platformID string, connectionParams 
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
 func GetUserTokens(db *sql.DB, fromUserId int, platform string) (string, string, error) {
-	var accessToken, refreshToken string
 
-	stmt := fmt.Sprintf(
-		"SELECT o.access_token, o.refresh_token FROM oauth2 o JOIN %q p on o.id = p.oauth2_id WHERE user_id = %d",
-		platform,
-		fromUserId,
-	)
+	// get the credentials from the database
+	connectionParams, err := GetUserConnection(db, fromUserId, platform)
 
-	// TODO: Use QueryRowContext instead
-	err := db.QueryRow(stmt).Scan(&accessToken, &refreshToken)
 	if err != nil {
 		return "", "", err
 	}
 
-	return accessToken, refreshToken, nil
+	// since we know we are going for tokens, parse them out of the connection struct
+	if connectionParams.ConnectionType != "oauth2" {
+		return "", "", errors.New("expected Oauth2 authentication type, was instead " + connectionParams.ConnectionType)
+	}
+
+	return connectionParams.Parameters["access_token"], connectionParams.Parameters["refresh_token"], nil
 }
 
-func GetPlatformsString(db *sql.DB, fromUserId int) (string, error) {
-	// Get user's platforms
-	var platformsStr string
+func GetUserConnection(db *sql.DB, userId int, platformName string) (Connection, error) {
+	// get the string from the database
+	var userConnection Connection
+	var credentials string
 
 	stmt := fmt.Sprintf(
-		`SELECT platforms FROM "user" WHERE id = %d`,
+		"SELECT connection_string FROM credentials WHERE user_id=%d AND platform_name='%s'",
+		userId,
+		platformName,
+	)
+
+	// TODO: Use QueryRowContext instead
+	err := db.QueryRow(stmt).Scan(&credentials)
+	if err != nil {
+		return userConnection, err
+	}
+
+	// get the actual user Connection parameters
+	userConnection, err = ParseConnectionString(credentials)
+
+	if err != nil {
+		return userConnection, err
+	}
+
+	return userConnection, nil
+}
+
+func ParseConnectionString(connectionString string) (Connection, error) {
+	returnedConnection := Connection{}
+
+	// split the Connection string into it's components
+	connectionParams := strings.Split(connectionString, ";")
+
+	// check what type of Connection string this is
+	switch connectionParams[0] {
+	case "oauth2":
+		// this is an oauth2 Connection, so we will need an access and refresh token
+		params := make(map[string]string)
+		params["access_token"] = connectionParams[1]
+		params["refresh_token"] = connectionParams[2]
+
+		returnedConnection.ConnectionType = "oauth2"
+		returnedConnection.Parameters = params
+		return returnedConnection, nil
+	default:
+		// this is not a supported Connection type, bad data in the database
+		return returnedConnection, errors.New("Connection type '" + connectionParams[0] + "' unsupported")
+	}
+}
+
+func GetPlatformsStringArray(db *sql.DB, fromUserId int) ([]string, error) {
+
+	stmt := fmt.Sprintf(
+		`SELECT platform_name FROM "credentials" WHERE user_id = %d`,
 		fromUserId,
 	)
 
 	// TODO: Use QueryRowContext instead
-	err := db.QueryRow(stmt).Scan(&platformsStr)
+	rows, err := db.Query(stmt)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return platformsStr, nil
+	defer rows.Close()
+
+	var currentPlatform string
+	var platforms []string
+
+	for rows.Next() {
+		err := rows.Scan(&currentPlatform)
+		if err != nil {
+
+			return platforms, err
+		}
+
+		platforms = append(platforms, currentPlatform)
+	}
+
+	return platforms, nil
 }

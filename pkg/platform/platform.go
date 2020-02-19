@@ -2,7 +2,6 @@ package platform
 
 import (
 	"database/sql"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -22,9 +21,7 @@ func InitializePlatforms(db *sql.DB, log *logrus.Logger) {
 	Platforms["fitbit"] = Fitbit{db: db, log: log}
 }
 
-func GetPlatforms(platformStr string) []Platform {
-	// Split string on comma (no space)
-	platformArr := strings.Split(platformStr, ",")
+func GetPlatforms(platformArr []string) []Platform {
 
 	// TODO: deal with panic in case of str no being in the map
 	var results []Platform
