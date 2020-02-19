@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/helpers"
+
 	"github.com/msgurgel/marathon/pkg/dal"
 	"github.com/msgurgel/marathon/pkg/platform"
 
@@ -65,7 +67,7 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([
 			log.WithFields(logrus.Fields{
 				"err":    err,
 				"userId": userId,
-				"date":   date.Format("2006-01-02"), // TODO: make this layout shared somehow?
+				"date":   date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetSteps for platform")
 			continue // Try the next platform

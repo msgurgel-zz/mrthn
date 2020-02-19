@@ -17,7 +17,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/msgurgel/marathon/pkg/helpers"
 
 	"github.com/msgurgel/marathon/pkg/dal"
 
@@ -267,14 +270,9 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 }
 
 // TODO: move this somewhere else?
-func parseISODate(dateStr string) (time.Time, error) {
-	date, err := time.Parse("2006-01-02", dateStr)
 
-	if err != nil {
-		return time.Time{}, err
 	}
 
-	return date, nil
 }
 
 func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId int, date time.Time, err error) {
@@ -290,7 +288,7 @@ func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId 
 		return 0, time.Time{}, errors.New("expected single 'date' parameter")
 	}
 
-	date, err = parseISODate(dateStr[0])
+	date, err = helpers.ParseISODate(dateStr[0])
 	if err != nil {
 		fields["dateStr"] = dateStr
 		fields["err"] = err

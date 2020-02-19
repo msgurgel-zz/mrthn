@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/helpers"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/msgurgel/marathon/pkg/client"
@@ -73,7 +75,7 @@ func (f Fitbit) getDailyActivity(user int, date time.Time) (dailyActivity, error
 
 func (f *Fitbit) callDailyActivityEndpoint(url string, accessToken string, date time.Time) (dailyActivity, error) {
 	// Add date to end of the Daily Activity URL
-	url = fmt.Sprintf("%s/%s.json", url, date.Format("2006-01-02"))
+	url = fmt.Sprintf("%s/%s.json", url, date.Format(helpers.ISOLayout))
 
 	// Make request to Fitbit servers
 	req, err := client.PrepareGETRequest(url)
