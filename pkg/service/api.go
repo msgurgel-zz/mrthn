@@ -20,20 +20,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/helpers"
-
-	"github.com/msgurgel/marathon/pkg/dal"
-
 	"github.com/gorilla/context"
-
-	"github.com/msgurgel/marathon/pkg/auth"
-	"github.com/msgurgel/marathon/pkg/environment"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/gorilla/mux"
 
+	"github.com/msgurgel/marathon/pkg/auth"
+	"github.com/msgurgel/marathon/pkg/dal"
+	"github.com/msgurgel/marathon/pkg/environment"
+	"github.com/msgurgel/marathon/pkg/helpers"
 	"github.com/msgurgel/marathon/pkg/model"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Api struct {
@@ -157,51 +153,50 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 
 		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
 		return
-	} else if !callbackOk || len(callBackURL) != 1 {
+	}
+
+	if !callbackOk || len(callBackURL) != 1 {
 		api.log.WithFields(logrus.Fields{
 			"func": "Login",
 		}).Error("missing URL param 'callback'")
 
 		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
 		return
-	} else {
-		// Get client ID from the context, set during the authentication phase
-		clientId := context.Get(r, "client_id").(int)
+	}
 
-		// Create the state object
-		RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
+	// Get client ID from the context, set during the authentication phase
+	clientId := context.Get(r, "client_id").(int)
 
-		if ok == nil {
-			url := RequestStateObject.URL                          // check what type of request was made using the StateObject
-			http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
-		}
+	// Create the state object TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
+	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
+
+	if ok == nil {
+		url := RequestStateObject.URL                          // check what type of request was made using the StateObject
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
 	}
 }
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
-	// Check that the state returned was valid
+	// Check that the state returned was valid TODO: Remove dependency on OAuth2
 	Oauth2Result, err := api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
-
-	if err == nil {
-
-		userId, err := createUser(&Oauth2Result, api.db, api.log)
-
-		if err != nil {
-
-			var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
-			api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
-		} else {
-			jsonStr := []byte(`{"userId":"` + string(userId) + `"}`)
-			api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
-		}
-
-	} else {
+	if err != nil {
 		// Something went wrong, instead of the result, send back the error
 		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
-		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
+		return
 	}
 
+	userId, err := createUser(&Oauth2Result, api.db, api.log)
+	if err != nil {
+		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
+		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+	} else {
+		jsonStr := []byte(`{"userId":"` + string(userId) + `"}`)
+		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+	}
 }
+
+// Helpers Functions
 
 func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	req, _ := http.NewRequest("POST", Callback, bytes.NewBuffer(body))
@@ -217,62 +212,6 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	}
 
 	defer callbackResponse.Body.Close()
-}
-
-// Helpers Functions
-
-// TODO: move this somewhere else?
-func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
-	// check what kind of service this user is being created for
-	switch Oauth2Params.Platform {
-	case "fitbit":
-
-		// before we create the user, check the id to see if its in the database
-
-		userId, err := dal.CheckUser(db, Oauth2Params.PlatformId, Oauth2Params.Platform)
-
-		if err != nil {
-			return 0, err
-		}
-
-		if userId != 0 {
-			// this user already exists, just return the userId
-			return userId, nil
-		}
-
-		// create the credentials for the user
-		var connectionParams = []string{"oauth2", Oauth2Params.AccessToken, Oauth2Params.RefreshToken}
-		userCredentials, err := dal.CreateUserCredentials(Oauth2Params.Platform, Oauth2Params.PlatformId, connectionParams)
-
-		if err != nil {
-			return 0, err
-		}
-
-		// make the fitbit user and return the userId
-		userId, err = dal.InsertUserCredentials(db, &userCredentials, Oauth2Params.ClientId)
-
-		if err != nil {
-
-			log.WithFields(logrus.Fields{
-				"err": err,
-			}).Error("failed to create a new fitbit user")
-			return 0, err
-		} else {
-			log.WithFields(logrus.Fields{
-				"userId": userId,
-			}).Info("new fitbit user created")
-			return userId, nil
-		}
-	default:
-		return 0, errors.New(Oauth2Params.Platform + " service does not exist")
-	}
-
-}
-
-// TODO: move this somewhere else?
-
-	}
-
 }
 
 func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId int, date time.Time, err error) {
@@ -298,6 +237,66 @@ func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId 
 	}
 
 	return userId, date, err
+}
+
+func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
+	// check what kind of service this user is being created for
+	switch Oauth2Params.PlatformName {
+	case "fitbit":
+		// before we create the user, check the id to see if its in the database
+		userId, err := dal.GetUserByPlatform(db, Oauth2Params.PlatformId, Oauth2Params.PlatformName)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if userId != 0 {
+			// this user already exists, just return the userId
+			return userId, nil
+		}
+
+		// create the credentials for the user
+		var connectionParams = []string{"oauth2", Oauth2Params.AccessToken, Oauth2Params.RefreshToken}
+		connStr, err := formatConnectionString(connectionParams)
+		if err != nil {
+			return 0, err
+		}
+
+		params := dal.CredentialParams{
+			ClientId:         Oauth2Params.ClientId,
+			PlatformName:     Oauth2Params.PlatformName,
+			PlatformId:       Oauth2Params.PlatformId,
+			ConnectionString: connStr,
+		}
+		userId, err = dal.InsertUserCredentials(db, params)
+
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"err": err,
+			}).Error("failed to create a new fitbit user")
+			return 0, err
+		} else {
+			log.WithFields(logrus.Fields{
+				"userId": userId,
+			}).Info("new fitbit user created")
+			return userId, nil
+		}
+	default:
+		return 0, errors.New(Oauth2Params.PlatformName + " service does not exist")
+	}
+}
+
+func formatConnectionString(connectionParams []string) (string, error) {
+	if len(connectionParams) == 0 {
+		return "", errors.New("must contain non zero amount of Connection parameters")
+	}
+
+	var sb strings.Builder
+	for _, param := range connectionParams {
+		sb.WriteString(param + ";")
+	}
+
+	return sb.String(), nil
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {

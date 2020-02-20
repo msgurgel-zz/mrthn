@@ -28,7 +28,7 @@ type OAuth2Result struct {
 	AccessToken  string
 	RefreshToken string
 	ClientId     int
-	Platform     string
+	PlatformName string
 	Callback     string
 	PlatformId   string
 }
@@ -111,8 +111,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
 
 			if err != nil {
-				// something went wrong
-				return OAuth2Result{}, err
+				return OAuth2Result{Callback: ReturnedState.Callback}, err
 			} else {
 
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
@@ -120,7 +119,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 					AccessToken:  token.AccessToken,
 					RefreshToken: token.RefreshToken,
 					ClientId:     ReturnedState.ClientId,
-					Platform:     ReturnedState.Platform,
+					PlatformName: ReturnedState.Platform,
 					Callback:     ReturnedState.Callback,
 					PlatformId:   token.Extra("user_id").(string),
 				}, err

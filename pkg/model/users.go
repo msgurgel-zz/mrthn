@@ -88,7 +88,7 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([
 }
 
 func getPlatforms(db *sql.DB, userId int, log *logrus.Logger) ([]platform.Platform, error) {
-	platformStr, err := dal.GetPlatformsStringArray(db, userId)
+	platformStr, err := dal.GetPlatformNames(db, userId)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err":    err,

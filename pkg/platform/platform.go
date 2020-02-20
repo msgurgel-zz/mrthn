@@ -21,11 +21,10 @@ func InitializePlatforms(db *sql.DB, log *logrus.Logger) {
 	Platforms["fitbit"] = Fitbit{db: db, log: log}
 }
 
-func GetPlatforms(platformArr []string) []Platform {
-
+func GetPlatforms(platformNames []string) []Platform {
 	// TODO: deal with panic in case of str no being in the map
 	var results []Platform
-	for _, platform := range platformArr {
+	for _, platform := range platformNames {
 		results = append(results, Platforms[platform])
 	}
 
