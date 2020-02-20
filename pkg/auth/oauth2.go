@@ -24,11 +24,11 @@ type Oauth2 struct {
 	CurrentStates map[string]StateKeys
 }
 
-type OAuthResult struct {
+type OAuth2Result struct {
 	AccessToken  string
 	RefreshToken string
 	ClientId     int
-	Service      string
+	PlatformName string
 	Callback     string
 	PlatformId   string
 }
@@ -37,7 +37,7 @@ type OAuthResult struct {
 // When the callback occurs, we compare the StateObject with the one that we got back
 type StateKeys struct {
 	UserId   int
-	Service  string
+	Platform string
 	State    []byte
 	URL      string
 	Callback string
@@ -97,7 +97,7 @@ func (o *Oauth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 }
 
 // ObtainUserTokens checks if the inputted state exists. If so, it attempts to exchange the passed in code for the access and refresh tokens
-func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuthResult, error) {
+func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, error) {
 
 	// first things first, does this state actually exist?
 	ReturnedState, err := o.retrieveStateObject(stateKey)
@@ -105,33 +105,32 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuthResult, er
 	if err == nil {
 		// This was an expected request.
 		// depending on what service was called, exchanging the code for the tokens may work slightly differently
-		switch ReturnedState.Service {
+		switch ReturnedState.Platform {
 		case "fitbit":
 			// exchange the code received for an access and refresh token
 			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
 
 			if err != nil {
-				// something went wrong
-				return OAuthResult{}, err
+				return OAuth2Result{Callback: ReturnedState.Callback}, err
 			} else {
 
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
-				return OAuthResult{
+				return OAuth2Result{
 					AccessToken:  token.AccessToken,
 					RefreshToken: token.RefreshToken,
 					ClientId:     ReturnedState.ClientId,
-					Service:      ReturnedState.Service,
+					PlatformName: ReturnedState.Platform,
 					Callback:     ReturnedState.Callback,
 					PlatformId:   token.Extra("user_id").(string),
 				}, err
 
 			}
 		default:
-			return OAuthResult{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Service + " service does not exist")
+			return OAuth2Result{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Platform + " service does not exist")
 		}
 	} else {
 		// this was an unexpected state
-		return OAuthResult{Callback: ReturnedState.Callback}, err
+		return OAuth2Result{Callback: ReturnedState.Callback}, err
 	}
 }
 
@@ -143,7 +142,7 @@ func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientId 
 
 	// get the type of service that the user wishes to login with
 	if serviceConfig, ok := o.Configs[service]; ok {
-		ReturnedKeys.Service = service
+		ReturnedKeys.Platform = service
 
 		// the user ID and service is valid, create a state string for it
 		stateString := createStateString(service)
