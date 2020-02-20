@@ -15,14 +15,14 @@ import (
 )
 
 type parseToken struct {
-	clientId int
+	clientID int
 	valid    bool
 }
 
-func generateJWT(clientId int, secret []byte) (string, error) {
+func generateJWT(clientID int, secret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		// TODO: Make client ID not an integer
-		Audience: strconv.Itoa(clientId),
+		Audience: strconv.Itoa(clientID),
 	})
 
 	// TODO: Add expiration to the token
@@ -35,8 +35,8 @@ func generateJWT(clientId int, secret []byte) (string, error) {
 func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if claims, ok := token.Claims.(*jwt.StandardClaims); ok {
-			clientId, _ := strconv.Atoi(claims.Audience)
-			return dal.GetClientSecret(db, clientId)
+			clientID, _ := strconv.Atoi(claims.Audience)
+			return dal.GetClientSecret(db, clientID)
 		} else {
 			return nil, errors.New("unable to parse JWT claims")
 		}
@@ -48,9 +48,9 @@ func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 
 	if token.Valid {
 		claims, _ := token.Claims.(*jwt.StandardClaims)
-		clientId, _ := strconv.Atoi(claims.Audience)
+		clientID, _ := strconv.Atoi(claims.Audience)
 		return parseToken{
-			clientId: clientId,
+			clientID: clientID,
 			valid:    true,
 		}, nil
 	}
@@ -73,7 +73,7 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 
 		parseToken, err := validateJWT(db, token)
 		if parseToken.valid {
-			context.Set(r, "client_id", parseToken.clientId)
+			context.Set(r, "client_id", parseToken.clientID)
 			next.ServeHTTP(w, r)
 		} else {
 			log.WithFields(logrus.Fields{

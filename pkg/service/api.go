@@ -55,13 +55,13 @@ func (api *Api) Index(w http.ResponseWriter, r *http.Request) {
 func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	// Get Client ID from request (check if clientID is in db)
 	idStr := r.FormValue("id")
-	clientId, err := strconv.Atoi(idStr)
+	clientID, err := strconv.Atoi(idStr)
 
 	// Generate random secret
 	secret := make([]byte, 64)
 	if _, err := io.ReadFull(rand.Reader, secret); err != nil {
 		api.log.WithFields(logrus.Fields{
-			"id":  clientId,
+			"id":  clientID,
 			"err": err,
 		}).Error("failed to generate secret token")
 
@@ -70,7 +70,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store secret in the DB as part of the Client table
-	rows, err := dal.InsertSecretInExistingClient(api.db, clientId, secret)
+	rows, err := dal.InsertSecretInExistingClient(api.db, clientID, secret)
 	if err != nil {
 		api.log.WithFields(logrus.Fields{
 			"err": err,
@@ -83,7 +83,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	// Make sure that we updated the client with the new secret
 	if rows != 1 {
 		api.log.WithFields(logrus.Fields{
-			"clientId": clientId,
+			"clientID": clientID,
 		}).Warn("received /get-token request with invalid client ID")
 
 		respondWithError(w, http.StatusBadRequest, "client ID does not exist")
@@ -91,7 +91,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add client ID as part of the JWT claims
-	tokenString, _ := generateJWT(clientId, secret)
+	tokenString, _ := generateJWT(clientID, secret)
 
 	// Send the token back to the requestor
 	_, err = w.Write([]byte(tokenString))
@@ -103,12 +103,12 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
-	userId, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
+	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 	}
 
-	caloriesValues, err := model.GetUserCalories(api.db, api.log, userId, date)
+	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -116,19 +116,19 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := GetUserCaloriesResponse200{
-		Id:       userId,
+		ID:       userID,
 		Calories: caloriesValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
-	userId, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
+	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 	}
 
-	stepsValues, err := model.GetUserSteps(api.db, api.log, userId, date)
+	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -136,7 +136,7 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := GetUserStepsResponse200{
-		Id:    userId,
+		ID:    userID,
 		Steps: stepsValues,
 	}
 	respondWithJSON(w, http.StatusOK, response)
@@ -165,10 +165,10 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get client ID from the context, set during the authentication phase
-	clientId := context.Get(r, "client_id").(int)
+	clientID := context.Get(r, "client_id").(int)
 
 	// Create the state object TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
-	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientId)
+	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientID)
 
 	if ok == nil {
 		url := RequestStateObject.URL                          // check what type of request was made using the StateObject
@@ -186,12 +186,12 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := createUser(&Oauth2Result, api.db, api.log)
+	userID, err := createUser(&Oauth2Result, api.db, api.log)
 	if err != nil {
 		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
 		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
 	} else {
-		jsonStr := []byte(`{"userId":"` + string(userId) + `"}`)
+		jsonStr := []byte(`{"userID":"` + string(userID) + `"}`)
 		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
 	}
 }
@@ -214,10 +214,10 @@ func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
 	defer callbackResponse.Body.Close()
 }
 
-func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId int, date time.Time, err error) {
+func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID int, date time.Time, err error) {
 	// Get user from URL
 	vars := mux.Vars(r)
-	userId, _ = strconv.Atoi(vars["userID"]) // TODO: deal with error
+	userID, _ = strconv.Atoi(vars["userID"]) // TODO: deal with error
 
 	// Get date from query params
 	dateStr, ok := r.URL.Query()["date"]
@@ -236,7 +236,7 @@ func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userId 
 		return 0, time.Time{}, errors.New("invalid date")
 	}
 
-	return userId, date, err
+	return userID, date, err
 }
 
 func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
@@ -244,15 +244,15 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 	switch Oauth2Params.PlatformName {
 	case "fitbit":
 		// before we create the user, check the id to see if its in the database
-		userId, err := dal.GetUserByPlatform(db, Oauth2Params.PlatformId, Oauth2Params.PlatformName)
+		userID, err := dal.GetUserByPlatform(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
 
 		if err != nil {
 			return 0, err
 		}
 
-		if userId != 0 {
-			// this user already exists, just return the userId
-			return userId, nil
+		if userID != 0 {
+			// this user already exists, just return the userID
+			return userID, nil
 		}
 
 		// create the credentials for the user
@@ -263,12 +263,12 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		}
 
 		params := dal.CredentialParams{
-			ClientId:         Oauth2Params.ClientId,
+			ClientID:         Oauth2Params.ClientID,
 			PlatformName:     Oauth2Params.PlatformName,
-			PlatformId:       Oauth2Params.PlatformId,
+			PlatformID:       Oauth2Params.PlatformID,
 			ConnectionString: connStr,
 		}
-		userId, err = dal.InsertUserCredentials(db, params)
+		userID, err = dal.InsertUserCredentials(db, params)
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -277,9 +277,9 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 			return 0, err
 		} else {
 			log.WithFields(logrus.Fields{
-				"userId": userId,
+				"userID": userID,
 			}).Info("new fitbit user created")
-			return userId, nil
+			return userID, nil
 		}
 	default:
 		return 0, errors.New(Oauth2Params.PlatformName + " service does not exist")
