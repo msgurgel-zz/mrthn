@@ -17,9 +17,9 @@ type Connection struct {
 }
 
 type CredentialParams struct {
-	ClientId         int
+	ClientID         int
 	PlatformName     string
-	PlatformId       string
+	PlatformID       string
 	ConnectionString string
 }
 
@@ -43,14 +43,14 @@ func InitializeDBConn(host string, port int, user, password, dbName string) (*sq
 	return db, nil
 }
 
-func InsertSecretInExistingClient(db *sql.DB, clientId int, secret []byte) (int64, error) {
+func InsertSecretInExistingClient(db *sql.DB, clientID int, secret []byte) (int64, error) {
 	// TODO: Use ExecContext instead
 	result, err := db.Exec(
 		`UPDATE marathon.public.client
 				SET secret = $1
 				WHERE id = $2`,
 		secret,
-		clientId,
+		clientID,
 	)
 
 	if err != nil {
@@ -61,10 +61,10 @@ func InsertSecretInExistingClient(db *sql.DB, clientId int, secret []byte) (int6
 	return rows, nil
 }
 
-func GetClientSecret(db *sql.DB, fromClientId int) ([]byte, error) {
+func GetClientSecret(db *sql.DB, fromClientID int) ([]byte, error) {
 	// TODO: Use QueryRowContext instead
 	var secret []byte
-	err := db.QueryRow("SELECT secret FROM client WHERE id = " + strconv.Itoa(fromClientId)).Scan(&secret)
+	err := db.QueryRow("SELECT secret FROM client WHERE id = " + strconv.Itoa(fromClientID)).Scan(&secret)
 	if err != nil {
 		return nil, err
 	}
@@ -72,17 +72,17 @@ func GetClientSecret(db *sql.DB, fromClientId int) ([]byte, error) {
 	return secret, nil
 }
 
-func GetUserByPlatform(db *sql.DB, platformId string, platformName string) (int, error) {
-	var userId int
+func GetUserByPlatform(db *sql.DB, platformID string, platformName string) (int, error) {
+	var userID int
 
 	// check if this user exists in the credentials
 	queryString := fmt.Sprintf(
 		"SELECT user_id FROM credentials WHERE platform_id='%s' AND platform_name='%s'",
-		platformId,
+		platformID,
 		platformName,
 	)
 
-	err := db.QueryRow(queryString).Scan(&userId)
+	err := db.QueryRow(queryString).Scan(&userID)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -94,7 +94,7 @@ func GetUserByPlatform(db *sql.DB, platformId string, platformName string) (int,
 		}
 	}
 
-	return userId, nil
+	return userID, nil
 }
 
 func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
@@ -116,8 +116,8 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	}()
 
 	// the first thing we need to do is to create a new user in the user table
-	var userId int
-	err = tx.QueryRow(`INSERT INTO marathon.public.user DEFAULT VALUES RETURNING id`).Scan(&userId)
+	var userID int
+	err = tx.QueryRow(`INSERT INTO marathon.public.user DEFAULT VALUES RETURNING id`).Scan(&userID)
 
 	if err != nil {
 		return 0, err
@@ -128,9 +128,9 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		"INSERT INTO marathon.public.credentials"+
 			" (user_id, platform_name, platform_id, connection_string) "+
 			"VALUES (%d,'%s','%s','%s')",
-		userId,
+		userID,
 		params.PlatformName,
-		params.PlatformId,
+		params.PlatformID,
 		params.ConnectionString,
 	)
 	_, err = tx.Exec(credentialsQuery)
@@ -140,7 +140,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// the final step is to add the user to the appropriate row in the userbase table
 	userbaseQuery := fmt.Sprintf(
-		"INSERT INTO marathon.public.userbase (user_id, client_id) VALUES (%d,%d)", userId, params.ClientId,
+		"INSERT INTO marathon.public.userbase (user_id, client_id) VALUES (%d,%d)", userID, params.ClientID,
 	)
 	_, err = tx.Exec(userbaseQuery)
 
@@ -148,13 +148,13 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
-	return userId, err // err will be update by the deferred func
+	return userID, err // err will be update by the deferred func
 }
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
-func GetUserTokens(db *sql.DB, fromUserId int, platform string) (string, string, error) {
+func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string, error) {
 	// get the credentials from the database
-	connectionParams, err := GetUserConnection(db, fromUserId, platform)
+	connectionParams, err := GetUserConnection(db, fromUserID, platform)
 
 	if err != nil {
 		return "", "", err
@@ -168,14 +168,14 @@ func GetUserTokens(db *sql.DB, fromUserId int, platform string) (string, string,
 	return connectionParams.Parameters["access_token"], connectionParams.Parameters["refresh_token"], nil
 }
 
-func GetUserConnection(db *sql.DB, userId int, platformName string) (Connection, error) {
+func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
 	// get the string from the database
 	var userConnection Connection
 	var credentials string
 
 	stmt := fmt.Sprintf(
 		"SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q",
-		userId,
+		userID,
 		platformName,
 	)
 
@@ -195,10 +195,10 @@ func GetUserConnection(db *sql.DB, userId int, platformName string) (Connection,
 	return userConnection, nil
 }
 
-func GetPlatformNames(db *sql.DB, fromUserId int) ([]string, error) {
+func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 	stmt := fmt.Sprintf(
 		`SELECT platform_name FROM "credentials" WHERE user_id = %d`,
-		fromUserId,
+		fromUserID,
 	)
 
 	// TODO: Use QueryRowContext instead

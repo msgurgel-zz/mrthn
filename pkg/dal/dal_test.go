@@ -31,17 +31,17 @@ func TestMain(m *testing.M) {
 
 func TestGetUserTokensHappyPath(t *testing.T) {
 	platformName := "fitbit"
-	userId := 1
+	userID := 1
 
 	cols := []string{
 		"connection_string",
 	}
 	rows := sqlmock.NewRows(cols).AddRow("oauth2;AC3SST0K3N;R3FR3SHT0K3N")
 
-	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q*", userId, platformName)
+	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q*", userID, platformName)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
-	accessTkn, refreshTkn, err := GetUserTokens(DB, userId, platformName)
+	accessTkn, refreshTkn, err := GetUserTokens(DB, userID, platformName)
 	if err != nil {
 		t.Errorf("failed to get user tokens: %s", err.Error())
 		return
@@ -52,7 +52,7 @@ func TestGetUserTokensHappyPath(t *testing.T) {
 }
 
 func TestGetPlatformNames(t *testing.T) {
-	userId := 1
+	userID := 1
 	expectedPlatforms := []string{"fitbit", "garmin", "google-fit", "map-my-tracks"}
 
 	cols := []string{
@@ -64,10 +64,10 @@ func TestGetPlatformNames(t *testing.T) {
 		rows = rows.AddRow(platName)
 	}
 
-	expectedSQL := fmt.Sprintf(`^SELECT platform_name FROM "credentials" WHERE user_id = %d*`, userId)
+	expectedSQL := fmt.Sprintf(`^SELECT platform_name FROM "credentials" WHERE user_id = %d*`, userID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
-	platformStr, err := GetPlatformNames(DB, userId)
+	platformStr, err := GetPlatformNames(DB, userID)
 	if err != nil {
 		t.Errorf("failed to get platforms: %s", err.Error())
 		return

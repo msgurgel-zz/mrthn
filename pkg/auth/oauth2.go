@@ -27,21 +27,21 @@ type Oauth2 struct {
 type OAuth2Result struct {
 	AccessToken  string
 	RefreshToken string
-	ClientId     int
+	ClientID     int
 	PlatformName string
 	Callback     string
-	PlatformId   string
+	PlatformID   string
 }
 
 // When a user needs to request OAuth2 authorization, we need to save the important information in the state object
 // When the callback occurs, we compare the StateObject with the one that we got back
 type StateKeys struct {
-	UserId   int
+	UserID   int
 	Platform string
 	State    []byte
 	URL      string
 	Callback string
-	ClientId int
+	ClientID int
 }
 
 func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
@@ -118,10 +118,10 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 				return OAuth2Result{
 					AccessToken:  token.AccessToken,
 					RefreshToken: token.RefreshToken,
-					ClientId:     ReturnedState.ClientId,
+					ClientID:     ReturnedState.ClientID,
 					PlatformName: ReturnedState.Platform,
 					Callback:     ReturnedState.Callback,
-					PlatformId:   token.Extra("user_id").(string),
+					PlatformID:   token.Extra("user_id").(string),
 				}, err
 
 			}
@@ -135,7 +135,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientId int) (StateKeys, error) {
+func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) {
 	ReturnedKeys := StateKeys{}
 
 	// check if the service actually exists
@@ -150,7 +150,7 @@ func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientId 
 		ReturnedKeys.State = []byte(stateString)
 		ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
 		ReturnedKeys.Callback = callbackURL
-		ReturnedKeys.ClientId = clientId
+		ReturnedKeys.ClientID = clientID
 
 		// Add this state to the state map
 		o.CurrentStates[string(ReturnedKeys.State)] = ReturnedKeys

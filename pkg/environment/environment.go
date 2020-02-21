@@ -128,12 +128,12 @@ func addPlatformConfig(service string) (platformConfig, error) {
 	newService := platformConfig{}
 
 	secretKey := "CLIENT_SECRET_" + service
-	clientIdKey := "CLIENT_ID_" + service
+	clientIDKey := "CLIENT_ID_" + service
 
 	// start parsing the  config variables
-	ClientID, KeyExists := os.LookupEnv(clientIdKey)
+	ClientID, KeyExists := os.LookupEnv(clientIDKey)
 	if !KeyExists {
-		return newService, errors.New("environment variable [" + clientIdKey + "] does not exist")
+		return newService, errors.New("environment variable [" + clientIDKey + "] does not exist")
 	}
 
 	ClientSecret, KeyExists := os.LookupEnv("CLIENT_SECRET_" + service)

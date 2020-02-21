@@ -19,8 +19,8 @@ type ValueResult struct {
 }
 
 // TODO: Can this be refactored, so there isn't as much copied code from GetUserSteps?
-func GetUserCalories(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([]ValueResult, error) {
-	platforms, err := getPlatforms(db, userId, log)
+func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+	platforms, err := getPlatforms(db, userID, log)
 	if err != nil {
 		return nil, err
 	}
@@ -28,11 +28,11 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userId int, date time.Time)
 	// Request steps from each platform
 	var caloriesValues []ValueResult
 	for _, p := range platforms {
-		result, err := p.GetCalories(userId, date)
+		result, err := p.GetCalories(userID, date)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"err":    err,
-				"userId": userId,
+				"userID": userID,
 				"date":   date.Format("2006-01-02"), // TODO: make this layout shared somehow?
 				"plat":   p.Name(),
 			}).Error("failed to call GetCalories for platform")
@@ -53,8 +53,8 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userId int, date time.Time)
 	return caloriesValues, nil
 }
 
-func GetUserSteps(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([]ValueResult, error) {
-	platforms, err := getPlatforms(db, userId, log)
+func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+	platforms, err := getPlatforms(db, userID, log)
 	if err != nil {
 		return nil, err
 	}
@@ -62,11 +62,11 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([
 	// Request steps from each platform
 	var stepsValues []ValueResult
 	for _, p := range platforms {
-		result, err := p.GetSteps(userId, date)
+		result, err := p.GetSteps(userID, date)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"err":    err,
-				"userId": userId,
+				"userID": userID,
 				"date":   date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetSteps for platform")
@@ -87,12 +87,12 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userId int, date time.Time) ([
 	return stepsValues, nil
 }
 
-func getPlatforms(db *sql.DB, userId int, log *logrus.Logger) ([]platform.Platform, error) {
-	platformStr, err := dal.GetPlatformNames(db, userId)
+func getPlatforms(db *sql.DB, userID int, log *logrus.Logger) ([]platform.Platform, error) {
+	platformStr, err := dal.GetPlatformNames(db, userID)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err":    err,
-			"userId": userId,
+			"userID": userID,
 		}).Error("failed to get platforms associated to user")
 
 		return nil, errors.New("server error, try again later")
