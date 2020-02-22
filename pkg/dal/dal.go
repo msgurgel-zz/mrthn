@@ -19,7 +19,7 @@ type Connection struct {
 type CredentialParams struct {
 	ClientID         int
 	PlatformName     string
-	PlatformID       string
+	UPID             string
 	ConnectionString string
 }
 
@@ -72,14 +72,16 @@ func GetClientSecret(db *sql.DB, fromClientID int) ([]byte, error) {
 	return secret, nil
 }
 
-func GetUserByPlatform(db *sql.DB, platformID string, platformName string) (int, error) {
+func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (int, error) {
 	var userID int
 
 	// check if this user exists in the credentials
 	queryString := fmt.Sprintf(
-		"SELECT user_id FROM credentials WHERE platform_id='%s' AND platform_name='%s'",
-		platformID,
+		"SELECT user_id FROM credentials c "+
+			"JOIN platform p ON c.platform_id = p.id "+
+			"WHERE p.name = %q AND c.upid = %q",
 		platformName,
+		platformID,
 	)
 
 	err := db.QueryRow(queryString).Scan(&userID)
@@ -117,7 +119,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// the first thing we need to do is to create a new user in the user table
 	var userID int
-	err = tx.QueryRow(`INSERT INTO marathon.public.user DEFAULT VALUES RETURNING id`).Scan(&userID)
+	err = tx.QueryRow(`INSERT INTO marathon.public."user" DEFAULT VALUES RETURNING id`).Scan(&userID)
 
 	if err != nil {
 		return 0, err
@@ -125,12 +127,12 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// add the user into the credentials table
 	credentialsQuery := fmt.Sprintf(
-		"INSERT INTO marathon.public.credentials"+
-			" (user_id, platform_name, platform_id, connection_string) "+
-			"VALUES (%d,'%s','%s','%s')",
+		"INSERT INTO credentials "+
+			"(user_id, platform_name, upid, connection_string) "+
+			"VALUES (%d, %q, %q, %q)",
 		userID,
 		params.PlatformName,
-		params.PlatformID,
+		params.UPID,
 		params.ConnectionString,
 	)
 	_, err = tx.Exec(credentialsQuery)
@@ -140,7 +142,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// the final step is to add the user to the appropriate row in the userbase table
 	userbaseQuery := fmt.Sprintf(
-		"INSERT INTO marathon.public.userbase (user_id, client_id) VALUES (%d,%d)", userID, params.ClientID,
+		"INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, params.ClientID,
 	)
 	_, err = tx.Exec(userbaseQuery)
 

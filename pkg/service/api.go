@@ -244,7 +244,7 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 	switch Oauth2Params.PlatformName {
 	case "fitbit":
 		// before we create the user, check the id to see if its in the database
-		userID, err := dal.GetUserByPlatform(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
+		userID, err := dal.GetUserByPlatformID(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
 
 		if err != nil {
 			return 0, err
@@ -265,7 +265,7 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		params := dal.CredentialParams{
 			ClientID:         Oauth2Params.ClientID,
 			PlatformName:     Oauth2Params.PlatformName,
-			PlatformID:       Oauth2Params.PlatformID,
+			UPID:             Oauth2Params.PlatformID,
 			ConnectionString: connStr,
 		}
 		userID, err = dal.InsertUserCredentials(db, params)
