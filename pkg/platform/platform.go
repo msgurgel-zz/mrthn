@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/dal"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,9 +18,16 @@ type Platform interface {
 }
 
 func InitializePlatforms(db *sql.DB, log *logrus.Logger) {
+	domains, err := dal.GetPlatformDomains(db)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("unable to get domains from the db")
+	}
+
 	Platforms = make(map[string]Platform)
 
-	Platforms["fitbit"] = Fitbit{db: db, log: log}
+	Platforms["fitbit"] = Fitbit{db: db, log: log, domain: domains["fitbit"]}
 }
 
 func GetPlatforms(platformNames []string) []Platform {

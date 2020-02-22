@@ -79,7 +79,7 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 	queryString := fmt.Sprintf(
 		"SELECT user_id FROM credentials c "+
 			"JOIN platform p ON c.platform_id = p.id "+
-			"WHERE p.name = %q AND c.upid = %q",
+			"WHERE p.name = '%s' AND c.upid = '%s'",
 		platformName,
 		platformID,
 	)
@@ -125,13 +125,21 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
+	// Get platform ID by name
+	var platformID int
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", params.PlatformName)
+	err = db.QueryRow(platIDQuery).Scan(&platformID)
+	if err != nil {
+		return 0, err
+	}
+
 	// add the user into the credentials table
 	credentialsQuery := fmt.Sprintf(
 		"INSERT INTO credentials "+
-			"(user_id, platform_name, upid, connection_string) "+
-			"VALUES (%d, %q, %q, %q)",
+			"(user_id, platform_id, upid, connection_string) "+
+			"VALUES (%d, %d, '%s', '%s')",
 		userID,
-		params.PlatformName,
+		platformID,
 		params.UPID,
 		params.ConnectionString,
 	)
@@ -171,27 +179,31 @@ func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string,
 }
 
 func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
-	// get the string from the database
-	var userConnection Connection
-	var credentials string
-
-	stmt := fmt.Sprintf(
-		"SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q",
-		userID,
-		platformName,
-	)
-
-	// TODO: Use QueryRowContext instead
-	err := db.QueryRow(stmt).Scan(&credentials)
+	// Get ID of platform using platform's name
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", platformName)
+	var platformID int
+	err := db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
-		return userConnection, err
+		return Connection{}, err
 	}
 
-	// get the actual user Connection parameters
-	userConnection, err = parseConnectionString(credentials)
+	// Get connection string using user's ID and the platform's ID
+	connStrQuery := fmt.Sprintf(
+		"SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d",
+		userID,
+		platformID,
+	)
+	var credentials string
+	err = db.QueryRow(connStrQuery).Scan(&credentials)
+	if err != nil {
+		return Connection{}, err
+	}
+
+	// Format the user connection values
+	userConnection, err := parseConnectionString(credentials)
 
 	if err != nil {
-		return userConnection, err
+		return Connection{}, err
 	}
 
 	return userConnection, nil
@@ -199,7 +211,9 @@ func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection,
 
 func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 	stmt := fmt.Sprintf(
-		`SELECT platform_name FROM "credentials" WHERE user_id = %d`,
+		"SELECT name FROM platform p "+
+			"JOIN credentials c ON p.id = c.platform_id "+
+			"WHERE user_id = %d",
 		fromUserID,
 	)
 
@@ -217,14 +231,35 @@ func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 	for rows.Next() {
 		err := rows.Scan(&currentPlatform)
 		if err != nil {
-
 			return platforms, err
 		}
-
 		platforms = append(platforms, currentPlatform)
 	}
 
 	return platforms, nil
+}
+
+func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
+	domains := make(map[string]string)
+
+	rows, err := db.Query("SELECT name, domain FROM platform")
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var domain string
+		err := rows.Scan(&name, &domain)
+		if err != nil {
+			return nil, err
+		}
+
+		domains[name] = domain
+	}
+
+	return domains, nil
 }
 
 func parseConnectionString(connectionString string) (Connection, error) {

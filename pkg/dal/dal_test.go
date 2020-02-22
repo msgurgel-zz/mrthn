@@ -89,13 +89,17 @@ func TestGetClientSecret_ShouldGetSecret(t *testing.T) {
 func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 	platformName := "fitbit"
 	userID := 1
+	platformID := 1
+
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platformName)
+	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platformID))
 
 	cols := []string{
 		"connection_string",
 	}
 	rows := sqlmock.NewRows(cols).AddRow("oauth2;AC3$$T0K3N;R3FR3$HT0K3N")
 
-	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q*", userID, platformName)
+	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*", userID, platformID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	accessTkn, refreshTkn, err := GetUserTokens(DB, userID, platformName)
@@ -113,7 +117,7 @@ func TestGetPlatformNames(t *testing.T) {
 	expectedPlatforms := []string{"fitbit", "garmin", "google-fit", "map-my-tracks"}
 
 	cols := []string{
-		"platform_name",
+		"name",
 	}
 
 	rows := sqlmock.NewRows(cols)
@@ -121,7 +125,7 @@ func TestGetPlatformNames(t *testing.T) {
 		rows = rows.AddRow(platName)
 	}
 
-	expectedSQL := fmt.Sprintf(`^SELECT platform_name FROM "credentials" WHERE user_id = %d*`, userID)
+	expectedSQL := fmt.Sprintf(`^SELECT name FROM platform p JOIN (.+) WHERE user_id = %d*`, userID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	platformStr, err := GetPlatformNames(DB, userID)
@@ -147,7 +151,7 @@ func TestGetUserByPlatformID(t *testing.T) {
 	expectedSQL := fmt.Sprintf(
 		"^SELECT user_id FROM credentials [a-z] "+
 			"JOIN platform [a-z]+ ON (.+) "+
-			"WHERE [a-z]+.name = %q AND [a-z]+.upid = %q*",
+			"WHERE [a-z]+.name = '%s' AND [a-z]+.upid = '%s'*",
 		platName,
 		platID,
 	)
@@ -166,6 +170,7 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Prepare params and expected results
 	userID := 1
 	clientID := 1
+	platID := 1
 	platName := "fitbit"
 	UPID := "A1B2C3"
 	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
@@ -173,12 +178,15 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Mock expected DB calls in order
 	Mock.ExpectBegin()
 	Mock.ExpectQuery(
-		`INSERT INTO marathon.public."user"`).
+		`^INSERT INTO marathon.public."user"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
+	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'", platName)
+	Mock.ExpectQuery(expectedPlatIDSQL).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
+
 	expectedCredentialsSQL := fmt.Sprintf(
-		"^INSERT INTO credentials (.+) VALUES (%d, %q, %q, %q)*",
-		clientID, platName, UPID, connStr,
+		"^INSERT INTO credentials (.+) VALUES (%d, %d, '%s', '%s')*",
+		clientID, platID, UPID, connStr,
 	)
 	Mock.ExpectExec(expectedCredentialsSQL).WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -208,4 +216,77 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	}
 
 	assert.Equal(t, userID, actualUserID)
+}
+
+func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
+	userID := 1
+	platID := 1
+	platName := "fitbit"
+	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
+
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platName)
+	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
+
+	connStrQuery := fmt.Sprintf(
+		"^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*",
+		userID, platID,
+	)
+	Mock.ExpectQuery(connStrQuery).WillReturnRows(sqlmock.NewRows([]string{"connection_string"}).AddRow(connStr))
+
+	// Call the func that we are testing
+	actualUserConnection, err := GetUserConnection(DB, userID, platName)
+
+	// Assertions
+	if err != nil {
+		t.Errorf("error was not expected when inserting user credentials: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Prepare result object
+	expectedResult := Connection{
+		ConnectionType: "oauth2",
+		Parameters: map[string]string{
+			"access_token":  "AC3$$T0K3N",
+			"refresh_token": "R3FR3$HT0K3N",
+		},
+	}
+	assert.Equal(t, expectedResult, actualUserConnection)
+}
+
+func TestGetPlatformDomains_ShouldGetDomains(t *testing.T) {
+	cols := []string{
+		"name",
+		"domain",
+	}
+
+	rows := sqlmock.NewRows(cols).
+		AddRow("fitbit", "api.fitbit.com").
+		AddRow("garmin", "api.garmin.org").
+		AddRow("google-fit", "api.google.com").
+		AddRow("map-my-tracks", "api.mpt.ca")
+
+	Mock.ExpectQuery("^SELECT name, domain FROM platform*").WillReturnRows(rows)
+
+	actualDomains, err := GetPlatformDomains(DB)
+	if err != nil {
+		t.Errorf("error was not expected when getting domains: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	expectedResult := map[string]string{
+		"fitbit":        "api.fitbit.com",
+		"garmin":        "api.garmin.org",
+		"google-fit":    "api.google.com",
+		"map-my-tracks": "api.mpt.ca",
+	}
+
+	assert.Equal(t, expectedResult, actualDomains)
 }

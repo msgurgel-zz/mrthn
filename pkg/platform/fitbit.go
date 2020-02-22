@@ -27,8 +27,9 @@ type dailyActivity struct {
 }
 
 type Fitbit struct {
-	db  *sql.DB
-	log *logrus.Logger
+	db     *sql.DB
+	log    *logrus.Logger
+	domain string
 }
 
 func (f Fitbit) Name() string {
@@ -63,7 +64,7 @@ func (f Fitbit) getDailyActivity(user int, date time.Time) (dailyActivity, error
 
 	// Call fitbit endpoint passing access token and date
 	dailyAct, err := f.callDailyActivityEndpoint(
-		"https://api.fitbit.com/1/user/-/activities/date",
+		f.domain+"/user/-/activities/date",
 		accessTkn,
 		date,
 	)
