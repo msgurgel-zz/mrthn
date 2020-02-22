@@ -89,13 +89,17 @@ func TestGetClientSecret_ShouldGetSecret(t *testing.T) {
 func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 	platformName := "fitbit"
 	userID := 1
+	platformID := 1
+
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platformName)
+	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platformID))
 
 	cols := []string{
 		"connection_string",
 	}
 	rows := sqlmock.NewRows(cols).AddRow("oauth2;AC3$$T0K3N;R3FR3$HT0K3N")
 
-	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q*", userID, platformName)
+	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*", userID, platformID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	accessTkn, refreshTkn, err := GetUserTokens(DB, userID, platformName)
@@ -220,7 +224,7 @@ func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
 	platName := "fitbit"
 	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
 
-	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = %q*", platName)
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platName)
 	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
 
 	connStrQuery := fmt.Sprintf(

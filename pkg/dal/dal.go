@@ -180,7 +180,7 @@ func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string,
 
 func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
 	// Get ID of platform using platform's name
-	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = %q", platformName)
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", platformName)
 	var platformID int
 	err := db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
