@@ -179,27 +179,31 @@ func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string,
 }
 
 func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
-	// get the string from the database
-	var userConnection Connection
-	var credentials string
-
-	stmt := fmt.Sprintf(
-		"SELECT connection_string FROM credentials WHERE user_id = %d AND platform_name = %q",
-		userID,
-		platformName,
-	)
-
-	// TODO: Use QueryRowContext instead
-	err := db.QueryRow(stmt).Scan(&credentials)
+	// Get ID of platform using platform's name
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = %q", platformName)
+	var platformID int
+	err := db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
-		return userConnection, err
+		return Connection{}, err
 	}
 
-	// get the actual user Connection parameters
-	userConnection, err = parseConnectionString(credentials)
+	// Get connection string using user's ID and the platform's ID
+	connStrQuery := fmt.Sprintf(
+		"SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d",
+		userID,
+		platformID,
+	)
+	var credentials string
+	err = db.QueryRow(connStrQuery).Scan(&credentials)
+	if err != nil {
+		return Connection{}, err
+	}
+
+	// Format the user connection values
+	userConnection, err := parseConnectionString(credentials)
 
 	if err != nil {
-		return userConnection, err
+		return Connection{}, err
 	}
 
 	return userConnection, nil

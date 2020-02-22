@@ -213,3 +213,42 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 
 	assert.Equal(t, userID, actualUserID)
 }
+
+func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
+	userID := 1
+	platID := 1
+	platName := "fitbit"
+	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
+
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = %q*", platName)
+	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
+
+	connStrQuery := fmt.Sprintf(
+		"^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*",
+		userID, platID,
+	)
+	Mock.ExpectQuery(connStrQuery).WillReturnRows(sqlmock.NewRows([]string{"connection_string"}).AddRow(connStr))
+
+	// Call the func that we are testing
+	actualUserConnection, err := GetUserConnection(DB, userID, platName)
+
+	// Assertions
+	if err != nil {
+		t.Errorf("error was not expected when inserting user credentials: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Prepare result object
+	expectedResult := Connection{
+		ConnectionType: "oauth2",
+		Parameters: map[string]string{
+			"access_token":  "AC3$$T0K3N",
+			"refresh_token": "R3FR3$HT0K3N",
+		},
+	}
+	assert.Equal(t, expectedResult, actualUserConnection)
+}
