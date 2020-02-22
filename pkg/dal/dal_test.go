@@ -252,3 +252,37 @@ func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
 	}
 	assert.Equal(t, expectedResult, actualUserConnection)
 }
+
+func TestGetPlatformDomains_ShouldGetDomains(t *testing.T) {
+	cols := []string{
+		"name",
+		"domain",
+	}
+
+	rows := sqlmock.NewRows(cols).
+		AddRow("fitbit", "api.fitbit.com").
+		AddRow("garmin", "api.garmin.org").
+		AddRow("google-fit", "api.google.com").
+		AddRow("map-my-tracks", "api.mpt.ca")
+
+	Mock.ExpectQuery("^SELECT name, domain FROM platform*").WillReturnRows(rows)
+
+	actualDomains, err := GetPlatformDomains(DB)
+	if err != nil {
+		t.Errorf("error was not expected when getting domains: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	expectedResult := map[string]string{
+		"fitbit":        "api.fitbit.com",
+		"garmin":        "api.garmin.org",
+		"google-fit":    "api.google.com",
+		"map-my-tracks": "api.mpt.ca",
+	}
+
+	assert.Equal(t, expectedResult, actualDomains)
+}

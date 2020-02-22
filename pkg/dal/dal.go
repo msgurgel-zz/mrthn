@@ -231,14 +231,35 @@ func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 	for rows.Next() {
 		err := rows.Scan(&currentPlatform)
 		if err != nil {
-
 			return platforms, err
 		}
-
 		platforms = append(platforms, currentPlatform)
 	}
 
 	return platforms, nil
+}
+
+func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
+	domains := make(map[string]string)
+
+	rows, err := db.Query("SELECT name, domain FROM platform")
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var domain string
+		err := rows.Scan(&name, &domain)
+		if err != nil {
+			return nil, err
+		}
+
+		domains[name] = domain
+	}
+
+	return domains, nil
 }
 
 func parseConnectionString(connectionString string) (Connection, error) {
