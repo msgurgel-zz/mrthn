@@ -151,7 +151,7 @@ func TestGetUserByPlatformID(t *testing.T) {
 	expectedSQL := fmt.Sprintf(
 		"^SELECT user_id FROM credentials [a-z] "+
 			"JOIN platform [a-z]+ ON (.+) "+
-			"WHERE [a-z]+.name = %q AND [a-z]+.upid = %q*",
+			"WHERE [a-z]+.name = '%s' AND [a-z]+.upid = '%s'*",
 		platName,
 		platID,
 	)
@@ -181,11 +181,11 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 		`^INSERT INTO marathon.public."user"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
-	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = %q", platName)
+	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'", platName)
 	Mock.ExpectQuery(expectedPlatIDSQL).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
 
 	expectedCredentialsSQL := fmt.Sprintf(
-		"^INSERT INTO credentials (.+) VALUES (%d, %d, %q, %q)*",
+		"^INSERT INTO credentials (.+) VALUES (%d, %d, '%s', '%s')*",
 		clientID, platID, UPID, connStr,
 	)
 	Mock.ExpectExec(expectedCredentialsSQL).WillReturnResult(sqlmock.NewResult(1, 1))

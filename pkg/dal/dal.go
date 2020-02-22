@@ -79,7 +79,7 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 	queryString := fmt.Sprintf(
 		"SELECT user_id FROM credentials c "+
 			"JOIN platform p ON c.platform_id = p.id "+
-			"WHERE p.name = %q AND c.upid = %q",
+			"WHERE p.name = '%s' AND c.upid = '%s'",
 		platformName,
 		platformID,
 	)
@@ -127,7 +127,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// Get platform ID by name
 	var platformID int
-	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = %q", params.PlatformName)
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", params.PlatformName)
 	err = db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
 		return 0, err
@@ -137,7 +137,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	credentialsQuery := fmt.Sprintf(
 		"INSERT INTO credentials "+
 			"(user_id, platform_id, upid, connection_string) "+
-			"VALUES (%d, %d, %q, %q)",
+			"VALUES (%d, %d, '%s', '%s')",
 		userID,
 		platformID,
 		params.UPID,
