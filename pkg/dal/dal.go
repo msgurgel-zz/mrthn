@@ -125,13 +125,21 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
+	// Get platform ID by name
+	var platformID int
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = %q", params.PlatformName)
+	err = db.QueryRow(platIDQuery).Scan(&platformID)
+	if err != nil {
+		return 0, err
+	}
+
 	// add the user into the credentials table
 	credentialsQuery := fmt.Sprintf(
 		"INSERT INTO credentials "+
-			"(user_id, platform_name, upid, connection_string) "+
-			"VALUES (%d, %q, %q, %q)",
+			"(user_id, platform_id, upid, connection_string) "+
+			"VALUES (%d, %d, %q, %q)",
 		userID,
-		params.PlatformName,
+		platformID,
 		params.UPID,
 		params.ConnectionString,
 	)

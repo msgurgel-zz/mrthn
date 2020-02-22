@@ -166,6 +166,7 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Prepare params and expected results
 	userID := 1
 	clientID := 1
+	platID := 1
 	platName := "fitbit"
 	UPID := "A1B2C3"
 	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
@@ -173,12 +174,15 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Mock expected DB calls in order
 	Mock.ExpectBegin()
 	Mock.ExpectQuery(
-		`INSERT INTO marathon.public."user"`).
+		`^INSERT INTO marathon.public."user"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
+	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = %q", platName)
+	Mock.ExpectQuery(expectedPlatIDSQL).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
+
 	expectedCredentialsSQL := fmt.Sprintf(
-		"^INSERT INTO credentials (.+) VALUES (%d, %q, %q, %q)*",
-		clientID, platName, UPID, connStr,
+		"^INSERT INTO credentials (.+) VALUES (%d, %d, %q, %q)*",
+		clientID, platID, UPID, connStr,
 	)
 	Mock.ExpectExec(expectedCredentialsSQL).WillReturnResult(sqlmock.NewResult(1, 1))
 
