@@ -199,7 +199,9 @@ func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection,
 
 func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 	stmt := fmt.Sprintf(
-		`SELECT platform_name FROM "credentials" WHERE user_id = %d`,
+		"SELECT name FROM platform p "+
+			"JOIN credentials c ON p.id = c.platform_id "+
+			"WHERE user_id = %d",
 		fromUserID,
 	)
 

@@ -113,7 +113,7 @@ func TestGetPlatformNames(t *testing.T) {
 	expectedPlatforms := []string{"fitbit", "garmin", "google-fit", "map-my-tracks"}
 
 	cols := []string{
-		"platform_name",
+		"name",
 	}
 
 	rows := sqlmock.NewRows(cols)
@@ -121,7 +121,7 @@ func TestGetPlatformNames(t *testing.T) {
 		rows = rows.AddRow(platName)
 	}
 
-	expectedSQL := fmt.Sprintf(`^SELECT platform_name FROM "credentials" WHERE user_id = %d*`, userID)
+	expectedSQL := fmt.Sprintf(`^SELECT name FROM platform p JOIN (.+) WHERE user_id = %d*`, userID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	platformStr, err := GetPlatformNames(DB, userID)
