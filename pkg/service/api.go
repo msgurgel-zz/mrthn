@@ -126,6 +126,7 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date)
