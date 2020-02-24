@@ -2,3 +2,5 @@
 .env
 .DS_Store
 runtime.log
+log/
+setup-db-env-vars.sh
