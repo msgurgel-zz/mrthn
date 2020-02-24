@@ -8,7 +8,6 @@
 package service
 
 import (
-	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
@@ -182,37 +181,43 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 	Oauth2Result, err := api.authMethods.Oauth2.ObtainUserTokens(r.FormValue("state"), r.FormValue("code"))
 	if err != nil {
 		// Something went wrong, instead of the result, send back the error
-		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
-		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
+		api.log.WithFields(logrus.Fields{
+			"func":  "Callback",
+			"err":   err,
+			"state": r.FormValue("state"),
+		}).Error("failed to retrieve Oauth2 token for user")
+		api.sendAuthorizationResult(w, r, 0, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
 		return
 	}
 
 	userID, err := createUser(&Oauth2Result, api.db, api.log)
 	if err != nil {
-		var jsonStr = []byte(`{"error":"` + err.Error() + `"}`)
-		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "Callback",
+			"err":  err,
+		}).Error("failed to create a new user in the database")
+
+		api.sendAuthorizationResult(w, r, userID, Oauth2Result.Callback)
 	} else {
-		jsonStr := []byte(`{"userID":"` + string(userID) + `"}`)
-		api.sendAuthorizationResult(jsonStr, Oauth2Result.Callback)
+		api.sendAuthorizationResult(w, r, userID, Oauth2Result.Callback)
 	}
 }
 
 // Helpers Functions
 
-func (api *Api) sendAuthorizationResult(body []byte, Callback string) {
-	req, _ := http.NewRequest("POST", Callback, bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
+func (api *Api) sendAuthorizationResult(w http.ResponseWriter, r *http.Request, userId int, Callback string) {
 
-	api.log.Info("sending authorization result [" + string(body) + "] to [" + Callback + "]")
-	callbackResponse, err := http.Post(Callback, "application/json", bytes.NewBuffer(body))
+	// add the url parameters to the callback url
+	Callback += fmt.Sprintf("?userId=%d", userId)
 
-	if err != nil {
-		// log the error
-		api.log.Error(err)
-		return
-	}
+	api.log.WithFields(logrus.Fields{
+		"callback": Callback,
+		"userId":   userId,
+	}).Info("sending login result to client")
 
-	defer callbackResponse.Body.Close()
+	http.Redirect(w, r, Callback, 307)
+
 }
 
 func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID int, date time.Time, err error) {
