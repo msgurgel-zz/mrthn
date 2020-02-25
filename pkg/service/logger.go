@@ -15,15 +15,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func SetupLogger() *logrus.Logger {
+func SetupLogger(logToStderr bool) *logrus.Logger {
 	logger := logrus.New()
 
-	// Create file to store logs
-	file, err := os.OpenFile("runtime.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err == nil {
-		logger.Out = file
-	} else {
-		logger.Info("Failed to log to file, using default stderr")
+	if !logToStderr {
+		// Create file to store logs
+		file, err := os.OpenFile("runtime.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err == nil {
+			logger.Out = file
+		} else {
+			logger.Info("Failed to log to file, using default stderr")
+		}
 	}
 
 	// Log formatting

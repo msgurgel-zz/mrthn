@@ -34,12 +34,29 @@ func main() {
 		time.Second*15,
 		"the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m",
 	)
+
+	var logToStderr bool
+	flag.BoolVar(
+		&logToStderr,
+		"log-to-stderr",
+		false,
+		"log to stderr instead of file",
+	)
+
+	var environmentType string
+	flag.StringVar(
+		&environmentType,
+		"env",
+		"development",
+		"sets the current running environment mode. [DEFAULT=development]",
+	)
+
 	flag.Parse()
 
-	log := service.SetupLogger()
+	log := service.SetupLogger(logToStderr)
 
 	// get the environment variables
-	env, err := environment.ReadEnvFile()
+	env, err := environment.ReadEnvFile(environmentType)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err": err,
@@ -47,13 +64,7 @@ func main() {
 	}
 
 	// Connect to database using configuration struct
-	db, err := dal.InitializeDBConn(
-		env.Database.Host,
-		env.Database.Port,
-		env.Database.User,
-		env.Database.Password,
-		env.Database.DatabaseName,
-	)
+	db, err := dal.InitializeDBConn(env.DBConnectionString)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err": err,
@@ -68,7 +79,7 @@ func main() {
 	router := service.NewRouter(db, log, env)
 
 	srv := &http.Server{
-		Addr:         env.Server.Address,
+		Addr:         ":" + env.Server.Port,
 		Handler:      router,
 		ReadTimeout:  env.Server.ReadTimeOut,
 		WriteTimeout: env.Server.IdleTimeout,
@@ -83,7 +94,7 @@ func main() {
 	}()
 
 	log.WithFields(logrus.Fields{
-		"addr": env.Server.Address,
+		"port": env.Server.Port,
 	}).Info("Server started")
 
 	c := make(chan os.Signal, 1)

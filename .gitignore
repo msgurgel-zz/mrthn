@@ -4,3 +4,4 @@
 runtime.log
 log/
 setup-db-env-vars.sh
+vendor/
