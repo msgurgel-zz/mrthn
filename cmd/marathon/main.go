@@ -79,7 +79,7 @@ func main() {
 	router := service.NewRouter(db, log, env)
 
 	srv := &http.Server{
-		Addr:         env.Server.Address,
+		Addr:         ":" + env.Server.Port,
 		Handler:      router,
 		ReadTimeout:  env.Server.ReadTimeOut,
 		WriteTimeout: env.Server.IdleTimeout,
@@ -94,7 +94,7 @@ func main() {
 	}()
 
 	log.WithFields(logrus.Fields{
-		"addr": env.Server.Address,
+		"port": env.Server.Port,
 	}).Info("Server started")
 
 	c := make(chan os.Signal, 1)

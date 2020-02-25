@@ -20,7 +20,7 @@ type MarathonConfig struct {
 
 // server config options
 type serverConfig struct {
-	Address      string
+	Port         string
 	ReadTimeOut  time.Duration
 	WriteTimeOut time.Duration
 	IdleTimeout  time.Duration
@@ -78,7 +78,7 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	}
 
 	srv := serverConfig{
-		Address:      os.Getenv("SERVER_ADDRESS"),
+		Port:         os.Getenv("PORT"),
 		ReadTimeOut:  time.Second * time.Duration(readTime),
 		WriteTimeOut: time.Second * time.Duration(writeTime),
 		IdleTimeout:  time.Second * time.Duration(idleTime),
