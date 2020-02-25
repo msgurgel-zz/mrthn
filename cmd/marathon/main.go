@@ -43,12 +43,20 @@ func main() {
 		"log to stderr instead of file",
 	)
 
+	var environmentType string
+	flag.StringVar(
+		&environmentType,
+		"env",
+		"development",
+		"sets the current running environment mode. [DEFAULT=development]",
+	)
+
 	flag.Parse()
 
 	log := service.SetupLogger(logToStderr)
 
 	// get the environment variables
-	env, err := environment.ReadEnvFile()
+	env, err := environment.ReadEnvFile(environmentType)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err": err,
