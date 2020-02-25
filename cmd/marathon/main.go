@@ -64,13 +64,7 @@ func main() {
 	}
 
 	// Connect to database using configuration struct
-	db, err := dal.InitializeDBConn(
-		env.Database.Host,
-		env.Database.Port,
-		env.Database.User,
-		env.Database.Password,
-		env.Database.DatabaseName,
-	)
+	db, err := dal.InitializeDBConn(env.DBConnectionString)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"err": err,

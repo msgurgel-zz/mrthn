@@ -11,11 +11,11 @@ import (
 
 // the overall structure that will contain our environment configs for the marathon service
 type MarathonConfig struct {
-	Server        serverConfig
-	Database      databaseConfig
-	FitBit        platformConfig
-	Callback      string        // this will be the callback for all services. If we need multiple, this may need to change
-	ClientTimeout time.Duration // the timeout for the client that is used to make requests for Marathon
+	Server             serverConfig
+	DBConnectionString string
+	FitBit             platformConfig
+	Callback           string        // this will be the callback for all services. If we need multiple, this may need to change
+	ClientTimeout      time.Duration // the timeout for the client that is used to make requests for Marathon
 }
 
 // server config options
@@ -24,14 +24,6 @@ type serverConfig struct {
 	ReadTimeOut  time.Duration
 	WriteTimeOut time.Duration
 	IdleTimeout  time.Duration
-}
-
-type databaseConfig struct {
-	Host         string
-	Port         int
-	User         string
-	Password     string
-	DatabaseName string
 }
 
 // Config struct specifically for Fitbit client ids, secrets, etc
@@ -94,21 +86,7 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 
 	setConfig.Server = srv
 
-	// Database config parsing
-	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
-	if err != nil {
-		return nil, err
-	}
-
-	db := databaseConfig{
-		Host:         os.Getenv("DB_HOST"),
-		Port:         port,
-		User:         os.Getenv("DB_USER"),
-		Password:     os.Getenv("DB_PASSWORD"),
-		DatabaseName: os.Getenv("DB_NAME"),
-	}
-
-	setConfig.Database = db
+	setConfig.DBConnectionString = os.Getenv("DB_CONNECTION_STRING")
 
 	// get the configs for the services
 	FitBitConfig, err := addPlatformConfig("FITBIT")
