@@ -41,86 +41,85 @@ type platformConfig struct {
 }
 
 // InitializeEnvironmentConfig takes the environment variables, and puts them all into an EnvironmentConfig struct
-func ReadEnvFile() (*MarathonConfig, error) {
+func ReadEnvFile(env string) (*MarathonConfig, error) {
 	// create the Environment Config struct we will return to the user
 	setConfig := MarathonConfig{}
 
-	// get the environment variables
-	err := godotenv.Load()
+	if env == "development" {
+		// Set environment vars using .env file
+		err := godotenv.Load()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// get the callback for all services
+	callbackUrl, KeyExists := os.LookupEnv("CALLBACK")
+	if !KeyExists {
+		return nil, errors.New("environment variable [CALLBACK] does not exist")
+	} else {
+		setConfig.Callback = callbackUrl
+	}
+
+	// get the client timeout
+	clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))
+	if err != nil {
+		return nil, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
+	} else {
+		setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
+	}
+
+	// start parsing the environment variables
+	readTime, err := strconv.Atoi(os.Getenv("READ_TIMEOUT"))
+	if err != nil {
+		return nil, err
+	}
+
+	writeTime, err := strconv.Atoi(os.Getenv("WRITE_TIMEOUT"))
+	if err != nil {
+		return nil, err
+	}
+
+	idleTime, err := strconv.Atoi(os.Getenv("IDLE_TIMEOUT"))
+	if err != nil {
+		return nil, err
+	}
+
+	srv := serverConfig{
+		Address:      os.Getenv("SERVER_ADDRESS"),
+		ReadTimeOut:  time.Second * time.Duration(readTime),
+		WriteTimeOut: time.Second * time.Duration(writeTime),
+		IdleTimeout:  time.Second * time.Duration(idleTime),
+	}
+
+	setConfig.Server = srv
+
+	// Database config parsing
+	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
+	if err != nil {
+		return nil, err
+	}
+
+	db := databaseConfig{
+		Host:         os.Getenv("DB_HOST"),
+		Port:         port,
+		User:         os.Getenv("DB_USER"),
+		Password:     os.Getenv("DB_PASSWORD"),
+		DatabaseName: os.Getenv("DB_NAME"),
+	}
+
+	setConfig.Database = db
+
+	// get the configs for the services
+	FitBitConfig, err := addPlatformConfig("FITBIT")
+
 	if err != nil {
 		return nil, err
 	} else {
-
-		// get the callback for all services
-		callbackUrl, KeyExists := os.LookupEnv("CALLBACK")
-		if !KeyExists {
-			return nil, errors.New("environment variable [CALLBACK] does not exist")
-		} else {
-			setConfig.Callback = callbackUrl
-		}
-
-		// get the client timeout
-		clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))
-		if err != nil {
-			return nil, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
-		} else {
-			setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
-		}
-
-		// start parsing the environment variables
-		readTime, err := strconv.Atoi(os.Getenv("READ_TIMEOUT"))
-		if err != nil {
-			return nil, err
-		}
-
-		writeTime, err := strconv.Atoi(os.Getenv("WRITE_TIMEOUT"))
-		if err != nil {
-			return nil, err
-		}
-
-		idleTime, err := strconv.Atoi(os.Getenv("IDLE_TIMEOUT"))
-		if err != nil {
-			return nil, err
-		}
-
-		srv := serverConfig{
-			Address:      os.Getenv("SERVER_ADDRESS"),
-			ReadTimeOut:  time.Second * time.Duration(readTime),
-			WriteTimeOut: time.Second * time.Duration(writeTime),
-			IdleTimeout:  time.Second * time.Duration(idleTime),
-		}
-
-		setConfig.Server = srv
-
-		// Database config parsing
-
-		port, err := strconv.Atoi(os.Getenv("DB_PORT"))
-		if err != nil {
-			return nil, err
-		}
-
-		db := databaseConfig{
-			Host:         os.Getenv("DB_HOST"),
-			Port:         port,
-			User:         os.Getenv("DB_USER"),
-			Password:     os.Getenv("DB_PASSWORD"),
-			DatabaseName: os.Getenv("DB_NAME"),
-		}
-
-		setConfig.Database = db
-
-		// get the configs for the services
-
-		FitBitConfig, err := addPlatformConfig("FITBIT")
-
-		if err != nil {
-			return nil, err
-		} else {
-			setConfig.FitBit = FitBitConfig
-		}
-
-		return &setConfig, nil
+		setConfig.FitBit = FitBitConfig
 	}
+
+	return &setConfig, nil
 }
 
 func addPlatformConfig(service string) (platformConfig, error) {
