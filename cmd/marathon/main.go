@@ -34,9 +34,18 @@ func main() {
 		time.Second*15,
 		"the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m",
 	)
+
+	var logToStderr bool
+	flag.BoolVar(
+		&logToStderr,
+		"log-to-stderr",
+		false,
+		"log to stderr instead of file",
+	)
+
 	flag.Parse()
 
-	log := service.SetupLogger()
+	log := service.SetupLogger(logToStderr)
 
 	// get the environment variables
 	env, err := environment.ReadEnvFile()
