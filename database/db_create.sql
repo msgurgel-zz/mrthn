@@ -38,4 +38,4 @@ CREATE INDEX credentials_upid_index ON credentials(upid);
 INSERT INTO client (name)
 VALUES ('Passive Marathon');
 
-INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1')
+INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1');

@@ -41,7 +41,7 @@ func InitializeDBConn(connectionString string) (*sql.DB, error) {
 func InsertSecretInExistingClient(db *sql.DB, clientID int, secret []byte) (int64, error) {
 	// TODO: Use ExecContext instead
 	result, err := db.Exec(
-		`UPDATE marathon.public.client
+		`UPDATE client
 				SET secret = $1
 				WHERE id = $2`,
 		secret,
@@ -114,7 +114,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 	// the first thing we need to do is to create a new user in the user table
 	var userID int
-	err = tx.QueryRow(`INSERT INTO marathon.public."user" DEFAULT VALUES RETURNING id`).Scan(&userID)
+	err = tx.QueryRow(`INSERT INTO "user" DEFAULT VALUES RETURNING id`).Scan(&userID)
 
 	if err != nil {
 		return 0, err
