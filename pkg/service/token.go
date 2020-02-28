@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/msgurgel/marathon/pkg/dal"
 
@@ -65,10 +64,11 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 
 		// Get token from the Authorization header
 		// format: Authorization: Bearer
-		tokens, ok := r.Header["Authorization"]
-		if ok && len(tokens) >= 1 {
-			token = tokens[0]
-			token = strings.TrimPrefix(token, "Bearer ")
+
+		tokenQuery, ok := r.URL.Query()["token"]
+
+		if ok && len(tokenQuery) >= 1 {
+			token = tokenQuery[0]
 		}
 
 		parseToken, err := validateJWT(db, token)
