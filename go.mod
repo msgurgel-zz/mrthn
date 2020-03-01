@@ -11,5 +11,6 @@ require (
 	github.com/lib/pq v1.3.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.5.1
+	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 )

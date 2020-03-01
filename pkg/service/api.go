@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 
 	"github.com/msgurgel/marathon/pkg/auth"
@@ -64,7 +63,8 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 			"err": err,
 		}).Error("failed to generate secret token")
 
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong. Try again later...")
+		api.respondWithError(w, http.StatusInternalServerError,
+			"Something went wrong. Try again later...")
 		return
 	}
 
@@ -75,7 +75,8 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 			"err": err,
 		}).Error("failed to update client with new generated secret")
 
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong. Try again later...")
+		api.respondWithError(w, http.StatusInternalServerError,
+			"Something went wrong. Try again later...")
 		return
 	}
 
@@ -85,7 +86,7 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 			"clientID": clientID,
 		}).Warn("received /get-token request with invalid client ID")
 
-		respondWithError(w, http.StatusBadRequest, "client ID does not exist")
+		api.respondWithError(w, http.StatusBadRequest, "client ID does not exist")
 		return
 	}
 
@@ -104,13 +105,13 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
 	}
 
 	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		api.respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -118,20 +119,20 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 		ID:       userID,
 		Calories: caloriesValues,
 	}
-	respondWithJSON(w, http.StatusOK, response)
+	api.respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		api.respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -139,10 +140,35 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 		ID:    userID,
 		Steps: stepsValues,
 	}
-	respondWithJSON(w, http.StatusOK, response)
+	api.respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
+
+	// first things first: we need to manually check if the client has passed in a JWT token in the url
+	token, tokenOk := r.URL.Query()["token"]
+	if !tokenOk || len(token) != 1 {
+		api.log.WithFields(logrus.Fields{
+			"func": "Login",
+		}).Error("missing URL param 'token'")
+
+		api.respondWithError(w, http.StatusBadRequest,
+			"Invalid token")
+		return
+	}
+
+	// if the token exists, we still need to verify it exists in the database
+	parseToken, err := validateJWT(api.db, token[0])
+	if err != nil || !parseToken.valid {
+
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("JWT was invalid")
+
+		api.respondWithError(w, http.StatusUnauthorized, "invalid JWT token")
+		return
+	}
+
 	service, serviceOk := r.URL.Query()["service"]
 	callBackURL, callbackOk := r.URL.Query()["callback"]
 
@@ -151,7 +177,8 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 			"func": "Login",
 		}).Error("missing URL param 'service'")
 
-		respondWithError(w, http.StatusBadRequest, "expected single 'service' parameter with name of service to authenticate with")
+		api.respondWithError(w, http.StatusBadRequest,
+			"expected single 'service' parameter with name of service to authenticate with")
 		return
 	}
 
@@ -160,15 +187,13 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 			"func": "Login",
 		}).Error("missing URL param 'callback'")
 
-		respondWithError(w, http.StatusBadRequest, "expected single 'callback' parameter to contain valid callback url")
+		api.respondWithError(w, http.StatusBadRequest,
+			"expected single 'callback' parameter to contain valid callback url")
 		return
 	}
 
-	// Get client ID from the context, set during the authentication phase
-	clientID := context.Get(r, "client_id").(int)
-
 	// Create the state object TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
-	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], clientID)
+	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], parseToken.clientID)
 
 	if ok == nil {
 		url := RequestStateObject.URL                          // check what type of request was made using the StateObject
@@ -202,6 +227,195 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 	} else {
 		api.sendAuthorizationResult(w, r, userID, Oauth2Result.Callback)
 	}
+}
+
+func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
+	// get the new values of the client
+	err := r.ParseForm()
+
+	if err != nil {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Error occurred while attempting to parse form values",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  err,
+			"func": "SignUp",
+		}).Error("error occurred while attempting to parse form values")
+
+		return
+	}
+
+	clientName := r.Form.Get("name")
+
+	if clientName == "" {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Expected parameter 'name' in request",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+		api.log.WithFields(logrus.Fields{
+			"err":  "client name was missing in forms field",
+			"func": "SignUp",
+		}).Error("error occurred while attempting to parse form values")
+		return
+	}
+
+	// check if the name already exists. This should probably be done already before signup is called
+	userId, err := dal.CheckClientName(api.db, clientName)
+
+	if err != nil {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Error occurred while processing request",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  err,
+			"func": "SignUp",
+		}).Error("failed to check client name")
+
+		return
+	}
+
+	if userId != 0 {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Client name already taken",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"clientName": clientName,
+			"func":       "SignUp",
+		}).Warn("signup client name already taken")
+
+		return
+	}
+
+	clientPassWord := r.Form.Get("password")
+
+	if clientPassWord == "" {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Expected parameter 'password' in request",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  "client password was missing in forms field",
+			"func": "SignUp",
+		}).Error("failed to check client password")
+		return
+	}
+
+	err = dal.CreateNewClient(api.db, clientName, clientPassWord)
+
+	if err != nil {
+		api.respondWithError(w, http.StatusInternalServerError, "Error occurred while attempting to create client")
+		api.log.WithFields(logrus.Fields{
+			"err":  err,
+			"func": "SignUp",
+		}).Error("error occurred while attempting to create client")
+		return
+	}
+
+	// Send a success message back
+	response := ClientSignUpResponse{
+		Success: true,
+		Error:   "",
+	}
+	api.respondWithJSON(w, http.StatusOK, response)
+	return
+}
+
+func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+
+	if err != nil {
+		response := ClientSignUpResponse{
+			Success: false,
+			Error:   "Error occurred while attempting to parse form values",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  err,
+			"func": "SignIn",
+		}).Error("failed to parse request form values")
+
+		return
+	}
+
+	clientName := r.Form.Get("name")
+
+	if clientName == "" {
+		response := ClientSignInResponse{
+			Success:  false,
+			ClientId: 0,
+			Error:    "Expected parameter 'name' in request",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  "form parameter 'name' was missing in request",
+			"func": "SignIn",
+		}).Error("failed to parse client 'name' parameter")
+		return
+	}
+
+	clientPassWord := r.Form.Get("password")
+
+	if clientPassWord == "" {
+		response := ClientSignInResponse{
+			Success:  false,
+			ClientId: 0,
+			Error:    "Expected parameter 'password' in request",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"err":  "form parameter 'password' was missing in request",
+			"func": "SignIn",
+		}).Error("failed to parse client 'password' parameter")
+		return
+	}
+
+	clientID, err := dal.SignInClient(api.db, clientName, clientPassWord)
+
+	if err != nil {
+		if clientID == 0 {
+			// there wasn't any client name in the database that matched that name
+			response := ClientSignInResponse{
+				Success:  false,
+				ClientId: 0,
+				Error:    "No client has the requested name: " + clientName,
+			}
+			api.respondWithJSON(w, http.StatusBadRequest, response)
+			return
+		}
+
+		// if the clientID wasn't found, that means the password didn't match
+		response := ClientSignInResponse{
+			Success:  false,
+			ClientId: clientID,
+			Error:    "Incorrect password",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	// Send a success message back
+	response := ClientSignInResponse{
+		Success:  true,
+		ClientId: clientID,
+		Error:    "",
+	}
+	api.respondWithJSON(w, http.StatusBadRequest, response)
+
 }
 
 // Helpers Functions
@@ -305,14 +519,23 @@ func formatConnectionString(connectionParams []string) (string, error) {
 	return sb.String(), nil
 }
 
-func respondWithError(w http.ResponseWriter, code int, message string) {
-	respondWithJSON(w, code, map[string]string{"error": message})
+func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {
+	api.respondWithJSON(w, code, map[string]string{"error": message})
+
+	api.log.WithFields(logrus.Fields{
+		"err":  message,
+		"code": code,
+	}).Error("Sending Error Response")
 }
 
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	response, _ := json.Marshal(payload)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response) // TODO: deal with possible error
+	_, err := w.Write(response) // TODO: deal with possible error
+
+	if err != nil {
+
+	}
 }

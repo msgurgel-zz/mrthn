@@ -9,7 +9,8 @@ CREATE TABLE "user"(
 CREATE TABLE client(
     id     SERIAL       PRIMARY KEY,
     name   VARCHAR(50)  NOT NULL,
-    secret BYTEA
+    secret BYTEA,
+    password TEXT NOT NULL
 );
 ​
 CREATE TABLE userbase(
@@ -35,7 +36,7 @@ CREATE TABLE credentials(
 CREATE INDEX credentials_upid_index ON credentials(upid);
 
 -- Insert initial setup values
-INSERT INTO client (name)
-VALUES ('Passive Marathon');
+INSERT INTO client (name, password)
+VALUES ('Passive Marathon', 'bad_hash');
 
 INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1');

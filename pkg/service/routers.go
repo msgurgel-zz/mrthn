@@ -92,7 +92,7 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"Login",
 			"GET",
 			"/login",
-			true,
+			false,
 			api.Login,
 		},
 
@@ -102,6 +102,21 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"/callback",
 			false,
 			api.Callback,
+		},
+
+		Route{
+			"SignUp",
+			"POST",
+			"/signup",
+			false,
+			api.SignUp,
+		},
+		Route{
+			"SignIn",
+			"POST",
+			"/signin",
+			false,
+			api.SignIn,
 		},
 	}
 
