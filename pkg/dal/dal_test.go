@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -35,7 +37,7 @@ func TestInsertSecretInExistingClient_ShouldInsertSecret(t *testing.T) {
 	clientID := 1
 
 	// Mock expected SQL queries
-	Mock.ExpectExec(`^UPDATE marathon.public.client`).
+	Mock.ExpectExec(`^UPDATE client`).
 		WithArgs(secret, clientID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -178,7 +180,7 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Mock expected DB calls in order
 	Mock.ExpectBegin()
 	Mock.ExpectQuery(
-		`^INSERT INTO marathon.public."user"`).
+		`^INSERT INTO "user"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
 	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'", platName)
@@ -289,4 +291,76 @@ func TestGetPlatformDomains_ShouldGetDomains(t *testing.T) {
 	}
 
 	assert.Equal(t, expectedResult, actualDomains)
+}
+
+func TestSignUp_ShouldInsertNewClient(t *testing.T) {
+	clientName := "New_Client"
+	clientPassword := "Client_Password"
+
+	Mock.ExpectExec(`INSERT INTO client`).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// call the function we are testing
+	err := CreateNewClient(DB, clientName, clientPassword)
+
+	if err != nil {
+		t.Errorf("error was not expected when inserting a client: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+}
+
+func TestSignIn_ShouldSignInExistingClient(t *testing.T) {
+	clientName := "Registered_Client"
+	clientPassword := "Client_Password"
+	clientID := 1
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(clientPassword), bcrypt.DefaultCost)
+
+	// Mock SQL rows
+	cols := []string{
+		"password",
+		"id",
+	}
+	rows := sqlmock.NewRows(cols).
+		AddRow(hashedPassword, clientID)
+
+	Mock.ExpectQuery(fmt.Sprintf("SELECT password,id FROM client WHERE name='%s'", clientName)).WillReturnRows(rows)
+
+	// call the function we are testing
+	returnedId, err := SignInClient(DB, clientName, clientPassword)
+
+	if err != nil {
+		t.Errorf("error was not expected when signing in a client: %s", err)
+	}
+
+	assert.Equal(t, clientID, returnedId)
+
+}
+
+func TestCheckClientName_ShouldReturnUserId(t *testing.T) {
+	clientName := "Searched_Client"
+	clientID := 1
+
+	// Mock SQL rows
+	cols := []string{
+		"id",
+	}
+	rows := sqlmock.NewRows(cols).
+		AddRow(clientID)
+
+	Mock.ExpectQuery(fmt.Sprintf("SELECT id FROM client WHERE name='%s'", clientName)).WillReturnRows(rows)
+
+	// call the function we are testing
+	returnedId, err := CheckClientName(DB, clientName)
+
+	if err != nil {
+		t.Errorf("error was not expected when searching for a client: %s", err)
+	}
+
+	assert.Equal(t, clientID, returnedId)
+
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Connection struct {
@@ -255,6 +256,71 @@ func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
 	}
 
 	return domains, nil
+}
+
+// CheckClientName takes in a client name, and returns the userId of the client,
+// or 0 if no client is using that name
+func CheckClientName(db *sql.DB, name string) (int, error) {
+	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name='%s'", name)
+
+	var userId int
+	// TODO: Use QueryRowContext instead
+	err := db.QueryRow(searchQuery).Scan(&userId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// there were no rows, but otherwise no error occurred.
+			// that means this name isn't being used in the database
+			return 0, nil
+		} else {
+			return 0, err
+		}
+	}
+
+	return userId, nil
+
+}
+
+func CreateNewClient(db *sql.DB, name string, password string) error {
+
+	// before we insert the password in the database, we must hash it
+	// bcrypt salts this for us, so we don't have to worry about it
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+
+	if err != nil {
+		return err
+	}
+
+	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES('%s','%s')", name, hash)
+
+	// TODO: Use ExecContext instead
+	_, err = db.Exec(insertQuery)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) {
+
+	searchQuery := fmt.Sprintf("SELECT password,id FROM client WHERE name='%s'", name)
+
+	var passwordResult string
+	var userId int
+	err := db.QueryRow(searchQuery).Scan(&passwordResult, &userId)
+	if err != nil {
+		return 0, err
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(passwordResult), []byte(enteredPassword))
+	if err != nil {
+		return userId, err
+	}
+
+	return userId, nil
+
 }
 
 func parseConnectionString(connectionString string) (Connection, error) {

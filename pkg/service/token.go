@@ -2,9 +2,11 @@ package service
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/msgurgel/marathon/pkg/dal"
 
@@ -63,12 +65,12 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 		var token string
 
 		// Get token from the Authorization header
-		// format: Authorization: Bearer
 
-		tokenQuery, ok := r.URL.Query()["token"]
+		tokens, ok := r.Header["Authorization"]
 
-		if ok && len(tokenQuery) >= 1 {
-			token = tokenQuery[0]
+		if ok && len(tokens) >= 1 {
+			token = tokens[0]
+			token = strings.TrimPrefix(token, "Bearer ")
 		}
 
 		parseToken, err := validateJWT(db, token)
@@ -80,7 +82,19 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 				"err": err,
 			}).Error("JWT was invalid")
 
-			respondWithError(w, http.StatusUnauthorized, "invalid JWT token")
+			// just copy/paste the code for this part
+
+			payload := map[string]string{"error": err.Error()}
+
+			response, _ := json.Marshal(payload)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, err := w.Write(response) // TODO: deal with possible error
+
+			if err != nil {
+
+			}
 		}
 	})
 }

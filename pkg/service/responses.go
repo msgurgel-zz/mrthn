@@ -20,3 +20,14 @@ type GetUserCaloriesResponse200 struct {
 
 	Calories []model.ValueResult `json:"steps,omitempty"`
 }
+
+type ClientSignUpResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+type ClientSignInResponse struct {
+	Success  bool   `json:"success"`
+	ClientId int    `json:"userID,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
