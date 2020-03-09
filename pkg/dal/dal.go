@@ -95,6 +95,42 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 	return userID, nil
 }
 
+func AddUserToClientUserBase(db *sql.DB, userID int, clientID int) error {
+	_, err := db.Exec(`INSERT into userbase(user_id, client_id) VALUES($1,$2)`, userID, clientID)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func GetUserInUserBase(db *sql.DB, userID int, clientID int) (int, error) {
+
+	// check if this user exists already in the userbase
+	queryString := fmt.Sprintf(
+		"SELECT user_id FROM userBase "+
+			"WHERE user_id = '%d' AND client_id = '%d'",
+		userID,
+		clientID,
+	)
+
+	err := db.QueryRow(queryString).Scan(&userID)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// there were no rows, but otherwise no error occurred.
+			// Return a zero
+			return 0, nil
+		} else {
+			return 0, err
+		}
+	}
+
+	return userID, nil
+}
+
 func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	// create a new transaction from the database Connection
 	tx, err := db.Begin()

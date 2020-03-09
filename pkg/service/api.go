@@ -471,7 +471,28 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		}
 
 		if userID != 0 {
-			// this user already exists, just return the userID
+
+			// this user already exists in the Marathon User table.
+			// However, the user may not exist in the clients userbase
+			// check if they do
+
+			userID, err := dal.GetUserInUserBase(db, userID, Oauth2Params.ClientID)
+
+			if err != nil {
+				return 0, err
+			}
+
+			if userID == 0 {
+				// the user exists, but is not in the clients userbase. Add it.
+				err := dal.AddUserToClientUserBase(db, userID, Oauth2Params.ClientID)
+				if err != nil {
+					return 0, err
+				}
+
+				return userID, nil
+			}
+			// the user already exists both in Marathon, and in the client's userbase
+			// what are we doing here? It's over. Go home.
 			return userID, nil
 		}
 

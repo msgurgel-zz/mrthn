@@ -364,3 +364,48 @@ func TestCheckClientName_ShouldReturnUserId(t *testing.T) {
 	assert.Equal(t, clientID, returnedId)
 
 }
+
+func TestAddClientToUserBase_ShouldNotReturnError(t *testing.T) {
+
+	clientID := 1
+	userID := 1
+
+	Mock.ExpectExec(`^INSERT into userbase`).
+		WithArgs(userID, clientID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// call the function we are testing
+	err := AddUserToClientUserBase(DB, userID, clientID)
+
+	if err != nil {
+		t.Errorf("error was not expected when adding a userId to a client userbase: %s", err)
+	}
+
+	assert.Equal(t, err, nil)
+
+}
+
+func TestGetUserInUserBase_ShouldReturnUserId(t *testing.T) {
+
+	clientID := 1
+	userID := 1
+
+	// Mock SQL rows
+	cols := []string{
+		"user_id",
+	}
+	rows := sqlmock.NewRows(cols).AddRow(userID)
+
+	expectedSQL := fmt.Sprintf("^SELECT user_id FROM userBase WHERE user_id = '%d' AND client_id = '%d'", userID, clientID)
+	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
+
+	// call the function we are testing
+	userIdActual, err := GetUserInUserBase(DB, userID, clientID)
+
+	if err != nil {
+		t.Errorf("error was not expected when adding a userId to a client userbase: %s", err)
+	}
+
+	assert.Equal(t, userID, userIdActual)
+
+}
