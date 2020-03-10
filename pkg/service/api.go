@@ -476,7 +476,7 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 			// However, the user may not exist in the clients userbase
 			// check if they do
 
-			userID, err := dal.GetUserInUserBase(db, userID, Oauth2Params.ClientID)
+			userID, err := dal.GetUserInUserbase(db, userID, Oauth2Params.ClientID)
 
 			if err != nil {
 				return 0, err
@@ -484,7 +484,7 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 
 			if userID == 0 {
 				// the user exists, but is not in the clients userbase. Add it.
-				err := dal.AddUserToClientUserBase(db, userID, Oauth2Params.ClientID)
+				err := dal.AddUserToUserbase(db, userID, Oauth2Params.ClientID)
 				if err != nil {
 					return 0, err
 				}
