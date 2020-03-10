@@ -37,7 +37,7 @@ func TestInsertSecretInExistingClient_ShouldInsertSecret(t *testing.T) {
 	clientID := 1
 
 	// Mock expected SQL queries
-	Mock.ExpectExec(`^UPDATE client`).
+	Mock.ExpectExec(`^UPDATE client SET secret`).
 		WithArgs(secret, clientID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -69,7 +69,7 @@ func TestGetClientSecret_ShouldGetSecret(t *testing.T) {
 	rows := sqlmock.NewRows(cols).AddRow(secret)
 
 	// Mock expected SQL queries
-	expectedSQL := fmt.Sprintf("^SELECT secret FROM client WHERE id = %d*", clientID)
+	expectedSQL := fmt.Sprintf("^SELECT secret FROM client WHERE id = %d$", clientID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	// Call the func that we are testing
@@ -93,7 +93,7 @@ func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 	userID := 1
 	platformID := 1
 
-	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platformName)
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'$", platformName)
 	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platformID))
 
 	cols := []string{
@@ -101,13 +101,18 @@ func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 	}
 	rows := sqlmock.NewRows(cols).AddRow("oauth2;AC3$$T0K3N;R3FR3$HT0K3N")
 
-	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*", userID, platformID)
+	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d$", userID, platformID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	accessTkn, refreshTkn, err := GetUserTokens(DB, userID, platformName)
 	if err != nil {
 		t.Errorf("failed to get user tokens: %s", err.Error())
 		return
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 
 	assert.Equal(t, "AC3$$T0K3N", accessTkn)
@@ -127,13 +132,18 @@ func TestGetPlatformNames(t *testing.T) {
 		rows = rows.AddRow(platName)
 	}
 
-	expectedSQL := fmt.Sprintf(`^SELECT name FROM platform p JOIN (.+) WHERE user_id = %d*`, userID)
+	expectedSQL := fmt.Sprintf(`^SELECT name FROM platform p JOIN (.+) WHERE user_id = %d$`, userID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
 	platformStr, err := GetPlatformNames(DB, userID)
 	if err != nil {
 		t.Errorf("failed to get platforms: %s", err.Error())
 		return
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 
 	assert.Equal(t, expectedPlatforms, platformStr)
@@ -153,7 +163,7 @@ func TestGetUserByPlatformID(t *testing.T) {
 	expectedSQL := fmt.Sprintf(
 		"^SELECT user_id FROM credentials [a-z] "+
 			"JOIN platform [a-z]+ ON (.+) "+
-			"WHERE [a-z]+.name = '%s' AND [a-z]+.upid = '%s'*",
+			"WHERE [a-z]+.name = '%s' AND [a-z]+.upid = '%s'$",
 		platName,
 		platID,
 	)
@@ -163,6 +173,11 @@ func TestGetUserByPlatformID(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to get user: %s", err.Error())
 		return
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 
 	assert.Equal(t, expectedUserID, userID)
@@ -180,20 +195,17 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 	// Mock expected DB calls in order
 	Mock.ExpectBegin()
 	Mock.ExpectQuery(
-		`^INSERT INTO "user"`).
+		`^INSERT INTO "user" DEFAULT VALUES RETURNING id$`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
-	expectedPlatIDSQL := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'", platName)
+	expectedPlatIDSQL := fmt.Sprintf(`^SELECT id FROM platform WHERE name = '%s'$`, platName)
 	Mock.ExpectQuery(expectedPlatIDSQL).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
 
-	expectedCredentialsSQL := fmt.Sprintf(
-		"^INSERT INTO credentials (.+) VALUES (%d, %d, '%s', '%s')*",
-		clientID, platID, UPID, connStr,
-	)
+	expectedCredentialsSQL := `^INSERT INTO credentials (.+) VALUES \(\d+, \d+, (.+), (.+)\)$`
 	Mock.ExpectExec(expectedCredentialsSQL).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	expectedUserbaseSQL := fmt.Sprintf(
-		`^INSERT INTO userbase (.+) VALUES \(%d, %d\)*`, // Need to escape the parenthesis or else Regex will think it's a capture group
+		`^INSERT INTO userbase (.+) VALUES \(%d, %d\)$`, // Need to escape the parenthesis or else Regex will think it's a capture group
 		userID, clientID,
 	)
 	Mock.ExpectExec(expectedUserbaseSQL).WillReturnResult(sqlmock.NewResult(1, 1))
@@ -226,11 +238,11 @@ func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
 	platName := "fitbit"
 	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
 
-	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'*", platName)
+	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'$", platName)
 	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
 
 	connStrQuery := fmt.Sprintf(
-		"^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d*",
+		"^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d$",
 		userID, platID,
 	)
 	Mock.ExpectQuery(connStrQuery).WillReturnRows(sqlmock.NewRows([]string{"connection_string"}).AddRow(connStr))
@@ -271,7 +283,7 @@ func TestGetPlatformDomains_ShouldGetDomains(t *testing.T) {
 		AddRow("google-fit", "api.google.com").
 		AddRow("map-my-tracks", "api.mpt.ca")
 
-	Mock.ExpectQuery("^SELECT name, domain FROM platform*").WillReturnRows(rows)
+	Mock.ExpectQuery("^SELECT name, domain FROM platform$").WillReturnRows(rows)
 
 	actualDomains, err := GetPlatformDomains(DB)
 	if err != nil {
@@ -297,11 +309,11 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 	clientName := "New_Client"
 	clientPassword := "Client_Password"
 
-	Mock.ExpectExec(`INSERT INTO client`).WillReturnResult(sqlmock.NewResult(1, 1))
+	Mock.ExpectExec(`^INSERT INTO client (.+) VALUES (.+)$`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	// call the function we are testing
 	err := CreateNewClient(DB, clientName, clientPassword)
-
 	if err != nil {
 		t.Errorf("error was not expected when inserting a client: %s", err)
 	}
@@ -310,7 +322,6 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 	if err := Mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
-
 }
 
 func TestSignIn_ShouldSignInExistingClient(t *testing.T) {
@@ -325,20 +336,21 @@ func TestSignIn_ShouldSignInExistingClient(t *testing.T) {
 		"password",
 		"id",
 	}
-	rows := sqlmock.NewRows(cols).
-		AddRow(hashedPassword, clientID)
-
-	Mock.ExpectQuery(fmt.Sprintf("SELECT password,id FROM client WHERE name='%s'", clientName)).WillReturnRows(rows)
+	rows := sqlmock.NewRows(cols).AddRow(hashedPassword, clientID)
+	Mock.ExpectQuery(fmt.Sprintf("^SELECT password, id FROM client WHERE name = '%s'$", clientName)).WillReturnRows(rows)
 
 	// call the function we are testing
 	returnedId, err := SignInClient(DB, clientName, clientPassword)
-
 	if err != nil {
 		t.Errorf("error was not expected when signing in a client: %s", err)
 	}
 
-	assert.Equal(t, clientID, returnedId)
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 
+	assert.Equal(t, clientID, returnedId)
 }
 
 func TestCheckClientName_ShouldReturnUserId(t *testing.T) {
@@ -349,18 +361,65 @@ func TestCheckClientName_ShouldReturnUserId(t *testing.T) {
 	cols := []string{
 		"id",
 	}
-	rows := sqlmock.NewRows(cols).
-		AddRow(clientID)
+	rows := sqlmock.NewRows(cols).AddRow(clientID)
 
-	Mock.ExpectQuery(fmt.Sprintf("SELECT id FROM client WHERE name='%s'", clientName)).WillReturnRows(rows)
+	Mock.ExpectQuery(fmt.Sprintf("^SELECT id FROM client WHERE name = '%s'$", clientName)).WillReturnRows(rows)
 
 	// call the function we are testing
 	returnedId, err := CheckClientName(DB, clientName)
-
 	if err != nil {
 		t.Errorf("error was not expected when searching for a client: %s", err)
 	}
 
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
 	assert.Equal(t, clientID, returnedId)
+}
+
+func TestAddUserToUserbase_ShouldNotReturnError(t *testing.T) {
+	clientID := 1
+	userID := 1
+
+	Mock.ExpectExec(`^INSERT INTO userbase (.+) VALUES \(\d+, \d+\)$`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// call the function we are testing
+	err := AddUserToUserbase(DB, userID, clientID)
+	if err != nil {
+		t.Errorf("error was not expected when adding a userID to a client userbase: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	assert.Equal(t, err, nil)
+}
+
+func TestGetUserInUserbase_ShouldReturnUserID(t *testing.T) {
+	clientID := 1
+	userID := 1
+
+	// Mock SQL rows
+	cols := []string{
+		"user_id",
+	}
+	rows := sqlmock.NewRows(cols).AddRow(userID)
+
+	expectedSQL := fmt.Sprintf("^SELECT user_id FROM userbase WHERE user_id = %d AND client_id = %d$", userID, clientID)
+	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
+
+	// call the function we are testing
+	userIDActual, err := GetUserInUserbase(DB, userID, clientID)
+
+	if err != nil {
+		t.Errorf("error was not expected when adding a userID to a client userbase: %s", err)
+	}
+
+	assert.Equal(t, userID, userIDActual)
 
 }

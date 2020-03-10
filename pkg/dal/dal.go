@@ -95,6 +95,41 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 	return userID, nil
 }
 
+func AddUserToUserbase(db *sql.DB, userID int, clientID int) error {
+	queryString := fmt.Sprintf("INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, clientID)
+
+	_, err := db.Exec(queryString)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
+	// check if this user exists already in the userbase
+	queryString := fmt.Sprintf(
+		"SELECT user_id FROM userbase WHERE user_id = %d AND client_id = %d",
+		userID,
+		clientID,
+	)
+
+	err := db.QueryRow(queryString).Scan(&userID)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// there were no rows, but otherwise no error occurred.
+			// Return a zero
+			return 0, nil
+		} else {
+			return 0, err
+		}
+	}
+
+	return userID, nil
+}
+
 func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	// create a new transaction from the database Connection
 	tx, err := db.Begin()
@@ -261,7 +296,7 @@ func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
 // CheckClientName takes in a client name, and returns the userId of the client,
 // or 0 if no client is using that name
 func CheckClientName(db *sql.DB, name string) (int, error) {
-	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name='%s'", name)
+	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name = '%s'", name)
 
 	var userId int
 	// TODO: Use QueryRowContext instead
@@ -290,7 +325,7 @@ func CreateNewClient(db *sql.DB, name string, password string) error {
 		return err
 	}
 
-	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES('%s','%s')", name, hash)
+	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s')", name, hash)
 
 	// TODO: Use ExecContext instead
 	_, err = db.Exec(insertQuery)
@@ -305,7 +340,7 @@ func CreateNewClient(db *sql.DB, name string, password string) error {
 
 func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) {
 
-	searchQuery := fmt.Sprintf("SELECT password,id FROM client WHERE name='%s'", name)
+	searchQuery := fmt.Sprintf("SELECT password, id FROM client WHERE name = '%s'", name)
 
 	var passwordResult string
 	var userId int
