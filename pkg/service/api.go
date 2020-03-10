@@ -122,6 +122,26 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 	api.respondWithJSON(w, http.StatusOK, response)
 }
 
+func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
+	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserDistance"})
+	if err != nil {
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
+	}
+
+	distanceValues, err := model.GetUserDistance(api.db, api.log, userID, date)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		api.respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := GetUserDistanceResponse200{
+		ID:       userID,
+		Distance: distanceValues,
+	}
+	api.respondWithJSON(w, http.StatusOK, response)
+}
+
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {

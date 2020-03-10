@@ -14,8 +14,8 @@ import (
 )
 
 type ValueResult struct {
-	Platform string `json:"platform,omitempty"`
-	Value    int    `json:"value"`
+	Platform string  `json:"platform,omitempty"`
+	Value    float64 `json:"value"`
 }
 
 // TODO: Can this be refactored, so there isn't as much copied code from GetUserSteps?
@@ -33,7 +33,7 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time)
 			log.WithFields(logrus.Fields{
 				"err":    err,
 				"userID": userID,
-				"date":   date.Format("2006-01-02"), // TODO: make this layout shared somehow?
+				"date":   date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetCalories for platform")
 			continue // Try the next platform
@@ -42,7 +42,7 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time)
 		// Format result and add to caloriesValues
 		caloriesVal := ValueResult{
 			Platform: p.Name(),
-			Value:    result,
+			Value:    float64(result),
 		}
 		caloriesValues = append(caloriesValues, caloriesVal)
 	}
@@ -76,7 +76,7 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([
 		// Format result and add to stepsValues
 		stepVal := ValueResult{
 			Platform: p.Name(),
-			Value:    result,
+			Value:    float64(result),
 		}
 		stepsValues = append(stepsValues, stepVal)
 	}
@@ -85,6 +85,40 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([
 		return nil, errors.New("could not connect to any platforms, try again later")
 	}
 	return stepsValues, nil
+}
+
+func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+	platforms, err := getPlatforms(db, userID, log)
+	if err != nil {
+		return nil, err
+	}
+
+	// Request steps from each platform
+	var distanceValues []ValueResult
+	for _, p := range platforms {
+		result, err := p.GetDistance(userID, date)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"err":    err,
+				"userID": userID,
+				"date":   date.Format(helpers.ISOLayout),
+				"plat":   p.Name(),
+			}).Error("failed to call GetDistance for platform")
+			continue // Try the next platform
+		}
+
+		// Format result and add to stepsValues
+		distanceVal := ValueResult{
+			Platform: p.Name(),
+			Value:    result,
+		}
+		distanceValues = append(distanceValues, distanceVal)
+	}
+
+	if len(distanceValues) == 0 {
+		return nil, errors.New("could not connect to any platforms, try again later")
+	}
+	return distanceValues, nil
 }
 
 func getPlatforms(db *sql.DB, userID int, log *logrus.Logger) ([]platform.Platform, error) {
