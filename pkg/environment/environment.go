@@ -16,6 +16,7 @@ type MarathonConfig struct {
 	FitBit             platformConfig
 	Callback           string        // this will be the callback for all services. If we need multiple, this may need to change
 	ClientTimeout      time.Duration // the timeout for the client that is used to make requests for Marathon
+	MarathonURL        string        // we will only accept client signup requests if ti comes from the Marathon website
 }
 
 // server config options
@@ -51,6 +52,14 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 		return nil, errors.New("environment variable [CALLBACK] does not exist")
 	} else {
 		setConfig.Callback = callbackUrl
+	}
+
+	// get the Marathon url
+	MarathonURL, KeyExists := os.LookupEnv("MARATHON_WEBSITE_URL")
+	if !KeyExists {
+		return nil, errors.New("environment variable [MARATHON_WEBSITE_URL] does not exist")
+	} else {
+		setConfig.MarathonURL = MarathonURL
 	}
 
 	// get the client timeout

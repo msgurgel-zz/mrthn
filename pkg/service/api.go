@@ -580,3 +580,31 @@ func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interfa
 
 	}
 }
+
+func checkOrigin(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Host != allowedOrigin {
+			log.WithFields(logrus.Fields{
+				"warn":        "Received request from not allowed host",
+				"host_origin": r.Host,
+			}).Warn("Request from Bad Host")
+
+			// just copy/paste the code for this part
+
+			payload := map[string]string{"error": "Unauthorized host"}
+
+			response, _ := json.Marshal(payload)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write(response) // TODO: deal with possible error
+
+			if err != nil {
+
+			}
+		} else {
+			next.ServeHTTP(w, r)
+		}
+	})
+}
