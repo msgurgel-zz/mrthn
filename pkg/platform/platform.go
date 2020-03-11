@@ -15,6 +15,7 @@ type Platform interface {
 	Name() string
 	GetSteps(user int, date time.Time) (int, error)
 	GetCalories(user int, date time.Time) (int, error)
+	GetDistance(user int, date time.Time) (float64, error)
 }
 
 func InitializePlatforms(db *sql.DB, log *logrus.Logger) {

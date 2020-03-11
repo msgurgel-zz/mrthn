@@ -89,6 +89,14 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 		},
 
 		Route{
+			"GetUserDistance",
+			"GET",
+			"/user/{userID}/distance",
+			true,
+			api.GetUserDistance,
+		},
+
+		Route{
 			"Login",
 			"GET",
 			"/login",

@@ -14,7 +14,11 @@ module TestServer
                                 {
                                     summary: {
                                         caloriesOut: 1010,
-                                        steps: 2020
+                                        steps: 2020,
+                                        distances: [
+                                                    {"activity":"total","distance":2.63},
+                                                    {"activity":"tracker","distance":2.63}
+                                                    ]
                                     }
                                 }
                             end

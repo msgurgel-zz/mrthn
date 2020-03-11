@@ -21,10 +21,22 @@ class SandwichTest < Minitest::Test
             }
         })
         parsed = JSON.parse(response.body)
-
         assert_equal 1, parsed["id"]
         assert_equal 'fitbit', parsed["steps"][0]["platform"]
         assert_equal 2020, parsed["steps"][0]["value"]
+    end
+
+    begin def test_get_distance_fitbit
+            response = HTTParty.get('http://localhost:8080/user/1/distance?date=2020-02-13', {
+                headers: {
+                    "User-Agent" => "Sandwich",
+                    "Authorization" => "Bearer #{@jwt}"
+                }
+            })
+            parsed = JSON.parse(response.body)
+            assert_equal 1, parsed["id"]
+            assert_equal 'fitbit', parsed["distance"][0]["platform"]
+            assert_equal 2.63, parsed["distance"][0]["value"]
     end
 
     def test_client_signup_name_already_taken
