@@ -332,7 +332,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = dal.CreateNewClient(api.db, clientName, clientPassWord)
+	clientID, err := dal.CreateNewClient(api.db, clientName, clientPassWord)
 
 	if err != nil {
 		api.respondWithError(w, http.StatusInternalServerError, "Error occurred while attempting to create client")
@@ -345,8 +345,10 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 
 	// Send a success message back
 	response := ClientSignUpResponse{
-		Success: true,
-		Error:   "",
+		Success:    true,
+		Error:      "",
+		ClientID:   clientID,
+		ClientName: clientName,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
 	return
@@ -581,10 +583,32 @@ func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interfa
 	}
 }
 
-func checkOrigin(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
+func checkMarathonURL(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		if r.Host != allowedOrigin {
+		originHeader := r.Header.Get("Origin")
+
+		if originHeader == "" {
+			log.WithFields(logrus.Fields{
+				"warn": "Request received with no 'Origin' header",
+			}).Warn("Request from Bad Host")
+
+			// just copy/paste the code for this part
+
+			payload := map[string]string{"error": "Unauthorized host"}
+
+			response, _ := json.Marshal(payload)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write(response) // TODO: deal with possible error
+
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"err": err.Error(),
+				}).Error("Error when trying to send response back to request sender")
+			}
+		} else if originHeader != allowedOrigin {
 			log.WithFields(logrus.Fields{
 				"warn":        "Received request from not allowed host",
 				"host_origin": r.Host,
@@ -601,7 +625,9 @@ func checkOrigin(log *logrus.Logger, next http.Handler, allowedOrigin string) ht
 			_, err := w.Write(response) // TODO: deal with possible error
 
 			if err != nil {
-
+				log.WithFields(logrus.Fields{
+					"err": err.Error(),
+				}).Error("Error when trying to send response back to request sender")
 			}
 		} else {
 			next.ServeHTTP(w, r)

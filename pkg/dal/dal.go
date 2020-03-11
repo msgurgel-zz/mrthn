@@ -315,26 +315,27 @@ func CheckClientName(db *sql.DB, name string) (int, error) {
 
 }
 
-func CreateNewClient(db *sql.DB, name string, password string) error {
+func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
 
 	// before we insert the password in the database, we must hash it
 	// bcrypt salts this for us, so we don't have to worry about it
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s')", name, hash)
+	var clientID int
+	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s') RETURNING id", name, hash)
 
 	// TODO: Use ExecContext instead
-	_, err = db.Exec(insertQuery)
+	err = db.QueryRow(insertQuery).Scan(&clientID)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return clientID, nil
 
 }
 
