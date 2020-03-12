@@ -50,8 +50,8 @@ func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2
 	// Initialize all platforms OAuth2 configs
 	OauthConfigs["fitbit"] = &oauth2.Config{
 		RedirectURL:  configs.Callback,
-		ClientID:     configs.FitBit.ClientID,
-		ClientSecret: configs.FitBit.ClientSecret,
+		ClientID:     configs.Fitbit.ClientID,
+		ClientSecret: configs.Fitbit.ClientSecret,
 		Scopes:       []string{"activity", "profile", "settings", "heartrate"},
 		Endpoint:     endpoints.Fitbit,
 	}

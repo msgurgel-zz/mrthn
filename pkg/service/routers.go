@@ -22,8 +22,8 @@ type Route struct {
 	Method              string
 	Pattern             string
 	Secure              bool
+	MarathonWebsiteOnly bool
 	HandlerFunc         http.HandlerFunc
-	OnlyMarathonRequest bool
 }
 
 type Routes []Route
@@ -40,8 +40,8 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonCo
 		if route.Secure {
 			handler = jwtMiddleware(db, logger, handler)
 		}
-		if route.OnlyMarathonRequest {
-			handler = checkOrigin(logger, handler, config.MarathonURL)
+		if route.MarathonWebsiteOnly {
+			handler = checkOrigin(logger, handler, config.MarathonWebsiteURL)
 		}
 		handler = Logger(logger, handler, route.Name)
 
@@ -64,8 +64,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/",
 			false,
-			api.Index,
 			false,
+			api.Index,
 		},
 
 		Route{
@@ -73,8 +73,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/get-token",
 			false,
-			api.GetToken,
 			true,
+			api.GetToken,
 		},
 
 		Route{
@@ -82,8 +82,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/user/{userID}/calories",
 			true,
-			api.GetUserCalories,
 			false,
+			api.GetUserCalories,
 		},
 
 		Route{
@@ -91,8 +91,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/user/{userID}/steps",
 			true,
-			api.GetUserSteps,
 			false,
+			api.GetUserSteps,
 		},
 
 		Route{
@@ -100,8 +100,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/user/{userID}/distance",
 			true,
-			api.GetUserDistance,
 			false,
+			api.GetUserDistance,
 		},
 
 		Route{
@@ -109,8 +109,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/login",
 			false,
-			api.Login,
 			true,
+			api.Login,
 		},
 
 		Route{
@@ -118,8 +118,8 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"GET",
 			"/callback",
 			false,
-			api.Callback,
 			false,
+			api.Callback,
 		},
 
 		Route{
@@ -127,16 +127,16 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 			"POST",
 			"/signup",
 			false,
-			api.SignUp,
 			true,
+			api.SignUp,
 		},
 		Route{
 			"SignIn",
 			"POST",
 			"/signin",
 			false,
-			api.SignIn,
 			true,
+			api.SignIn,
 		},
 	}
 
