@@ -13,9 +13,10 @@ import (
 type MarathonConfig struct {
 	Server             serverConfig
 	DBConnectionString string
-	FitBit             platformConfig
+	Fitbit             platformConfig
 	Callback           string        // this will be the callback for all services. If we need multiple, this may need to change
 	ClientTimeout      time.Duration // the timeout for the client that is used to make requests for Marathon
+	MarathonWebsiteURL string        // we will only accept client signup requests if ti comes from the Marathon website
 }
 
 // server config options
@@ -46,11 +47,19 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	}
 
 	// get the callback for all services
-	callbackUrl, KeyExists := os.LookupEnv("CALLBACK")
-	if !KeyExists {
+	callbackUrl, keyExists := os.LookupEnv("CALLBACK")
+	if !keyExists {
 		return nil, errors.New("environment variable [CALLBACK] does not exist")
 	} else {
 		setConfig.Callback = callbackUrl
+	}
+
+	// get the Marathon url
+	marathonURL, keyExists := os.LookupEnv("MARATHON_WEBSITE_URL")
+	if !keyExists {
+		return nil, errors.New("environment variable [MARATHON_WEBSITE_URL] does not exist")
+	} else {
+		setConfig.MarathonWebsiteURL = marathonURL
 	}
 
 	// get the client timeout
@@ -94,7 +103,7 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	if err != nil {
 		return nil, err
 	} else {
-		setConfig.FitBit = FitBitConfig
+		setConfig.Fitbit = FitBitConfig
 	}
 
 	return &setConfig, nil
