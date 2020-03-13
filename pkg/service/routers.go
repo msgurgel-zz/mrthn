@@ -41,7 +41,7 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonCo
 			handler = jwtMiddleware(db, logger, handler)
 		}
 		if route.MarathonWebsiteOnly {
-			handler = checkOrigin(logger, handler, config.MarathonWebsiteURL)
+			handler = checkMarathonURL(logger, handler, config.MarathonWebsiteURL)
 		}
 		handler = Logger(logger, handler, route.Name)
 

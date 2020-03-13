@@ -7,7 +7,9 @@
  */
 package service
 
-import "github.com/msgurgel/marathon/pkg/model"
+import (
+	"github.com/msgurgel/marathon/pkg/model"
+)
 
 type GetUserStepsResponse200 struct {
 	ID int `json:"id,omitempty"`
@@ -28,8 +30,10 @@ type GetUserDistanceResponse200 struct {
 }
 
 type ClientSignUpResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
+	Success    bool   `json:"success"`
+	ClientID   int    `json:"clientID"`
+	ClientName string `json:"clientName"`
+	Error      string `json:"error,omitempty"`
 }
 
 type ClientSignInResponse struct {

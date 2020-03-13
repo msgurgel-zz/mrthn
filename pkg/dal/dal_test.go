@@ -309,11 +309,16 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 	clientName := "New_Client"
 	clientPassword := "Client_Password"
 
-	Mock.ExpectExec(`^INSERT INTO client (.+) VALUES (.+)$`).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	// Mock SQL rows
+	cols := []string{
+		"id",
+	}
+	rows := sqlmock.NewRows(cols).AddRow(1)
+
+	Mock.ExpectQuery(`INSERT INTO client (.+) VALUES (.+)$`).WillReturnRows(rows)
 
 	// call the function we are testing
-	err := CreateNewClient(DB, clientName, clientPassword)
+	clientID, err := CreateNewClient(DB, clientName, clientPassword)
 	if err != nil {
 		t.Errorf("error was not expected when inserting a client: %s", err)
 	}
@@ -322,6 +327,8 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 	if err := Mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
+
+	assert.Equal(t, clientID, 1)
 }
 
 func TestSignIn_ShouldSignInExistingClient(t *testing.T) {
