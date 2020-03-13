@@ -251,7 +251,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	// get the new values of the client
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(500)
 
 	if err != nil {
 		response := ClientSignUpResponse{
