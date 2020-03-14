@@ -11,6 +11,8 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/rs/cors"
+
 	"github.com/msgurgel/marathon/pkg/environment"
 
 	"github.com/gorilla/mux"
@@ -37,12 +39,20 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonCo
 		var handler http.Handler
 		handler = route.HandlerFunc
 
+		// JWT Middleware
 		if route.Secure {
 			handler = jwtMiddleware(db, logger, handler)
 		}
+
+		// Check Marathon Website Origin Middleware
 		if route.MarathonWebsiteOnly {
 			handler = checkMarathonURL(logger, handler, config.MarathonWebsiteURL)
 		}
+
+		// CORS Middleware
+		handler = cors.Default().Handler(handler)
+
+		// Logger Middleware
 		handler = Logger(logger, handler, route.Name)
 
 		router.

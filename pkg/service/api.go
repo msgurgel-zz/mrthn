@@ -251,7 +251,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	// get the new values of the client
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(500)
 
 	if err != nil {
 		response := ClientSignUpResponse{
@@ -440,7 +440,7 @@ func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// Helpers Functions
+// Private Functions
 
 func (api *Api) sendAuthorizationResult(w http.ResponseWriter, r *http.Request, userId int, Callback string) {
 
@@ -563,74 +563,57 @@ func formatConnectionString(connectionParams []string) (string, error) {
 }
 
 func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {
-	api.respondWithJSON(w, code, map[string]string{"error": message})
-
-	api.log.WithFields(logrus.Fields{
-		"err":  message,
-		"code": code,
-	}).Error("Sending Error Response")
+	err := api.respondWithJSON(w, code, map[string]string{"error": message})
+	if err == nil {
+		api.log.WithFields(logrus.Fields{
+			"err":  message,
+			"code": code,
+		}).Info("sent response to client")
+	}
 }
 
-func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interface{}) error {
 	response, _ := json.Marshal(payload)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_, err := w.Write(response) // TODO: deal with possible error
+	_, err := w.Write(response)
 
 	if err != nil {
-
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to send response to client")
 	}
+
+	return err
 }
 
 func checkMarathonURL(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		originHeader := r.Header.Get("Origin")
 
-		if originHeader == "" {
+		if originHeader != allowedOrigin {
 			log.WithFields(logrus.Fields{
-				"warn": "Request received with no 'Origin' header",
-			}).Warn("Request from Bad Host")
-
-			// just copy/paste the code for this part
+				"host_origin": originHeader,
+			}).Warn("received request from non-allowed host")
 
 			payload := map[string]string{"error": "Unauthorized host"}
-
 			response, _ := json.Marshal(payload)
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			_, err := w.Write(response) // TODO: deal with possible error
+			_, err := w.Write(response)
 
 			if err != nil {
 				log.WithFields(logrus.Fields{
 					"err": err.Error(),
-				}).Error("Error when trying to send response back to request sender")
+				}).Error("error when trying to send response back to request sender")
 			}
-		} else if originHeader != allowedOrigin {
-			log.WithFields(logrus.Fields{
-				"warn":        "Received request from not allowed host",
-				"host_origin": r.Host,
-			}).Warn("Request from Bad Host")
 
-			// just copy/paste the code for this part
-
-			payload := map[string]string{"error": "Unauthorized host"}
-
-			response, _ := json.Marshal(payload)
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_, err := w.Write(response) // TODO: deal with possible error
-
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"err": err.Error(),
-				}).Error("Error when trying to send response back to request sender")
-			}
-		} else {
-			next.ServeHTTP(w, r)
+			return
 		}
+
+		// Call was made from Marathon Website, call the next middleware
+		next.ServeHTTP(w, r)
 	})
 }
