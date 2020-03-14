@@ -53,8 +53,31 @@ func (api *Api) Index(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	// Get Client ID from request (check if clientID is in db)
-	idStr := r.FormValue("id")
-	clientID, err := strconv.Atoi(idStr)
+	//idStr := r.FormValue("id")
+
+	idStr, ok := r.URL.Query()["id"]
+
+	if !ok || len(idStr[0]) < 1 {
+		api.log.WithFields(logrus.Fields{
+			"err": "url parameter 'id' not found in request",
+		}).Error("id of client missing/malformed")
+
+		api.respondWithError(w, http.StatusBadRequest,
+			"Error: clientId missing")
+		return
+	}
+
+	clientID, err := strconv.Atoi(idStr[0])
+
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("id of client malformed")
+
+		api.respondWithError(w, http.StatusBadRequest,
+			"Error: clientId must be an integer")
+		return
+	}
 
 	// Generate random secret
 	secret := make([]byte, 64)
