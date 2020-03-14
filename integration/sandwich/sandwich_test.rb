@@ -28,70 +28,75 @@ class SandwichTest < Minitest::Test
     end
 
     def test_client_signup_name_already_taken
-        response = HTTParty.post('http://localhost:8080/signup', {
-            :body => {
-                :name => 'Sandwich',
-                :password => 'whatever'
+        response = HTTParty.post(
+            'http://localhost:8080/signup',
+            multipart: true,
+            body: {
+                name: 'Sandwich',
+                password: 'whatever'
             },
-            :headers => {
-                'Content-Type' => 'application/x-www-form-urlencoded',
+            headers: {
                 'Origin' => 'https://marathon-18119.firebaseapp.com'
             }
-        })
+        )
         parsed = JSON.parse(response.body)
 
         assert_equal false, parsed["success"]
         assert_equal 'Client name already taken', parsed["error"]
     end
 
-     def test_client_signup_no_name
-        response = HTTParty.post('http://localhost:8080/signup', {
-            :body => {
-                :password => 'whatever'
+    def test_client_signup_no_name
+        response = HTTParty.post(
+            'http://localhost:8080/signup',
+            multipart: true,
+            body: {
+                password: 'whatever'
             },
-            :headers => {
-                'Content-Type' => 'application/x-www-form-urlencoded',
+            headers: {
                 'Origin' => 'https://marathon-18119.firebaseapp.com'
             }
-        })
+        )
         parsed = JSON.parse(response.body)
 
         assert_equal false, parsed["success"]
         assert_equal "Expected parameter 'name' in request", parsed["error"]
-     end
+    end
 
-     def test_client_signup_no_password
-        response = HTTParty.post('http://localhost:8080/signup', {
-            :body => {
-                :name => 'no_password_client'
+    def test_client_signup_no_password
+        response = HTTParty.post(
+            'http://localhost:8080/signup',
+            multipart: true,
+            body: {
+                name: 'no_password_client',
             },
-            :headers => {
-                'Content-Type' => 'application/x-www-form-urlencoded',
+            headers: {
                 'Origin' => 'https://marathon-18119.firebaseapp.com'
             }
-        })
+        )
         parsed = JSON.parse(response.body)
 
         assert_equal false, parsed["success"]
         assert_equal "Expected parameter 'password' in request", parsed["error"]
-     end
+    end
 
-     def test_client_signup_new_client
-            response = HTTParty.post('http://localhost:8080/signup', {
-                :body => {
-                    :name => 'new_name',
-                    :password => 'pass12345'
-                },
-                :headers => {
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                    'Origin' => 'https://marathon-18119.firebaseapp.com'
-                    }
-            })
-            parsed = JSON.parse(response.body)
+    def test_client_signup_new_client
+        response = HTTParty.post(
+            'http://localhost:8080/signup',
+            multipart: true,
+            body: {
+                name: 'new_name',
+                password: 'pass12345'
+            },
+            headers: {
+                'Origin' => 'https://marathon-18119.firebaseapp.com'
+            }
+        )
 
-            assert_equal true, parsed["success"]
-            assert_nil parsed["error"]
-     end
+        parsed = JSON.parse(response.body)
+
+        assert_equal true, parsed["success"]
+        assert_nil parsed["error"]
+    end
 
     def test_client_signin_wrong_password
         response = HTTParty.post('http://localhost:8080/signin', {
