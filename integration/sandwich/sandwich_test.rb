@@ -96,10 +96,13 @@ class SandwichTest < Minitest::Test
 
         assert_equal true, parsed["success"]
         assert_nil parsed["error"]
+        assert_kind_of Integer, parsed["clientID"]
+        assert_equal "new_name", parsed["clientName"]
     end
 
     def test_client_signin_wrong_password
         response = HTTParty.post('http://localhost:8080/signin', {
+            multipart: true,
             :body => {
                 :name => 'Sandwich',
                 :password => 'Bad_Password'

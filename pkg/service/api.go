@@ -29,6 +29,8 @@ import (
 	"github.com/msgurgel/marathon/pkg/model"
 )
 
+const FormMaxMemoryLimit = 128
+
 type Api struct {
 	log         *logrus.Logger
 	authMethods auth.Types
@@ -254,7 +256,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	// get the new values of the client
-	err := r.ParseMultipartForm(500)
+	err := r.ParseMultipartForm(FormMaxMemoryLimit)
 
 	if err != nil {
 		response := ClientSignUpResponse{
@@ -358,7 +360,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 	// TODO: Make sure that this uses ParseForm instead of ParseMultipartForm
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(FormMaxMemoryLimit)
 	if err != nil {
 		response := ClientSignUpResponse{
 			Success: false,
