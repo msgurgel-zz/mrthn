@@ -9,17 +9,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// the overall structure that will contain our environment configs for the marathon service
+// MarathonConfig is the overall structure that will contain our environment configs for the marathon service
 type MarathonConfig struct {
 	Server             serverConfig
 	DBConnectionString string
 	Fitbit             platformConfig
-	Callback           string        // this will be the callback for all services. If we need multiple, this may need to change
-	ClientTimeout      time.Duration // the timeout for the client that is used to make requests for Marathon
-	MarathonWebsiteURL string        // we will only accept client signup requests if ti comes from the Marathon website
+	Callback           string        // This will be the callback for all services. If we need multiple, this may need to change
+	ClientTimeout      time.Duration // The timeout for the client that is used to make requests for Marathon
+	MarathonWebsiteURL string        // We will only accept client SignUp requests if it comes from the Marathon website
 }
 
-// server config options
+// Server config options
 type serverConfig struct {
 	Port         string
 	ReadTimeOut  time.Duration
@@ -33,9 +33,9 @@ type platformConfig struct {
 	ClientSecret string
 }
 
-// InitializeEnvironmentConfig takes the environment variables, and puts them all into an EnvironmentConfig struct
+// ReadEnvFile takes the environment variables, and puts them all into an EnvironmentConfig struct
 func ReadEnvFile(env string) (*MarathonConfig, error) {
-	// create the Environment Config struct we will return to the user
+	// Create the Environment Config struct we will return to the user
 	setConfig := MarathonConfig{}
 
 	if env == "development" {
@@ -46,44 +46,41 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 		}
 	}
 
-	// get the callback for all services
-	callbackUrl, keyExists := os.LookupEnv("CALLBACK")
-	if !keyExists {
-		return nil, errors.New("environment variable [CALLBACK] does not exist")
-	} else {
-		setConfig.Callback = callbackUrl
+	// Get the callback for all services
+	callbackUrl := os.Getenv("CALLBACK")
+	if callbackUrl == "" {
+		return nil, errors.New("environment variable CALLBACK is not set")
 	}
+	setConfig.Callback = callbackUrl
 
-	// get the Marathon url
-	marathonURL, keyExists := os.LookupEnv("MARATHON_WEBSITE_URL")
-	if !keyExists {
-		return nil, errors.New("environment variable [MARATHON_WEBSITE_URL] does not exist")
-	} else {
-		setConfig.MarathonWebsiteURL = marathonURL
+	// Get the Marathon URL
+	marathonURL := os.Getenv("MARATHON_WEBSITE_URL")
+	if marathonURL == "" {
+		return nil, errors.New("environment variable MARATHON_WEBSITE_URL is not set")
 	}
+	setConfig.MarathonWebsiteURL = marathonURL
 
-	// get the client timeout
+	// Get the client timeout
 	clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))
 	if err != nil {
-		return nil, errors.New("environment variable [CLIENT_TIMEOUT] does not exist")
-	} else {
-		setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
+		return nil, errors.New("failed to convert CLIENT_TIMEOUT to int")
 	}
+	setConfig.ClientTimeout = time.Second * time.Duration(clientTimeout)
 
-	// start parsing the environment variables
+	// Start parsing the environment variables
 	readTime, err := strconv.Atoi(os.Getenv("READ_TIMEOUT"))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to convert READ_TIMEOUT to int")
 	}
 
 	writeTime, err := strconv.Atoi(os.Getenv("WRITE_TIMEOUT"))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to convert WRITE_TIMEOUT to int")
 	}
 
 	idleTime, err := strconv.Atoi(os.Getenv("IDLE_TIMEOUT"))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to convert IDLE_TIMEOUT to int")
 	}
 
 	srv := serverConfig{
@@ -96,40 +93,42 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	setConfig.Server = srv
 
 	setConfig.DBConnectionString = os.Getenv("DB_CONNECTION_STRING")
+	if setConfig.DBConnectionString == "" {
+		return nil, errors.New("environment variable DB_CONNECTION_STRING is not set")
+	}
 
 	// get the configs for the services
-	FitBitConfig, err := addPlatformConfig("FITBIT")
-
+	FitbitConfig, err := addPlatformConfig("FITBIT")
 	if err != nil {
 		return nil, err
-	} else {
-		setConfig.Fitbit = FitBitConfig
 	}
+
+	setConfig.Fitbit = FitbitConfig
 
 	return &setConfig, nil
 }
 
 func addPlatformConfig(service string) (platformConfig, error) {
-	// create the platformConfig we will return back
+	// Create the platformConfig we will return back
 	newService := platformConfig{}
 
 	secretKey := "CLIENT_SECRET_" + service
 	clientIDKey := "CLIENT_ID_" + service
 
-	// start parsing the  config variables
-	ClientID, KeyExists := os.LookupEnv(clientIDKey)
-	if !KeyExists {
+	// Start parsing the config variables
+	clientID := os.Getenv(clientIDKey)
+	if clientID == "" {
 		return newService, errors.New("environment variable [" + clientIDKey + "] does not exist")
 	}
 
-	ClientSecret, KeyExists := os.LookupEnv("CLIENT_SECRET_" + service)
-	if !KeyExists {
+	clientSecret := os.Getenv("CLIENT_SECRET_" + service)
+	if clientSecret == "" {
 		return newService, errors.New("environment variable [" + secretKey + "] does not exist")
 	}
 
-	// we got they keys, so we're fine
-	newService.ClientSecret = ClientSecret
-	newService.ClientID = ClientID
+	// We got they keys, so we're fine
+	newService.ClientSecret = clientSecret
+	newService.ClientID = clientID
 
 	return newService, nil
 }

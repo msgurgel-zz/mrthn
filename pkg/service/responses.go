@@ -11,21 +11,18 @@ import (
 	"github.com/msgurgel/marathon/pkg/model"
 )
 
-type GetUserStepsResponse200 struct {
-	ID int `json:"id,omitempty"`
-
+type GetUserStepsResponse struct {
+	ID    int                 `json:"id,omitempty"`
 	Steps []model.ValueResult `json:"steps,omitempty"`
 }
 
-type GetUserCaloriesResponse200 struct {
-	ID int `json:"id,omitempty"`
-
+type GetUserCaloriesResponse struct {
+	ID       int                 `json:"id,omitempty"`
 	Calories []model.ValueResult `json:"steps,omitempty"`
 }
 
-type GetUserDistanceResponse200 struct {
-	ID int `json:"id,omitempty"`
-
+type GetUserDistanceResponse struct {
+	ID       int                 `json:"id,omitempty"`
 	Distance []model.ValueResult `json:"distance,omitempty"`
 }
 
@@ -38,6 +35,6 @@ type ClientSignUpResponse struct {
 
 type ClientSignInResponse struct {
 	Success  bool   `json:"success"`
-	ClientId int    `json:"userID,omitempty"`
+	ClientID int    `json:"userID,omitempty"`
 	Error    string `json:"error,omitempty"`
 }

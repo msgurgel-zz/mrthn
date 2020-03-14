@@ -71,7 +71,7 @@ func GetClientSecret(db *sql.DB, fromClientID int) ([]byte, error) {
 func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (int, error) {
 	var userID int
 
-	// check if this user exists in the credentials
+	// Check if this user exists in the credentials
 	queryString := fmt.Sprintf(
 		"SELECT user_id FROM credentials c "+
 			"JOIN platform p ON c.platform_id = p.id "+
@@ -108,7 +108,7 @@ func AddUserToUserbase(db *sql.DB, userID int, clientID int) error {
 }
 
 func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
-	// check if this user exists already in the userbase
+	// Check if this user exists already in the userbase
 	queryString := fmt.Sprintf(
 		"SELECT user_id FROM userbase WHERE user_id = %d AND client_id = %d",
 		userID,
@@ -131,14 +131,14 @@ func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
 }
 
 func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
-	// create a new transaction from the database Connection
+	// Create a new transaction from the database Connection
 	tx, err := db.Begin()
 
 	if err != nil {
 		return 0, err
 	}
 
-	// we need to either commit or rollback the transaction after it is done.
+	// We need to either commit or rollback the transaction after it is done.
 	defer func() {
 		if err != nil {
 			// something went wrong, rollback the transaction
@@ -148,7 +148,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		}
 	}()
 
-	// the first thing we need to do is to create a new user in the user table
+	// The first thing we need to do is to create a new user in the user table
 	var userID int
 	err = tx.QueryRow(`INSERT INTO "user" DEFAULT VALUES RETURNING id`).Scan(&userID)
 
@@ -164,7 +164,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
-	// add the user into the credentials table
+	// Add the user into the credentials table
 	credentialsQuery := fmt.Sprintf(
 		"INSERT INTO credentials "+
 			"(user_id, platform_id, upid, connection_string) "+
@@ -179,7 +179,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
-	// the final step is to add the user to the appropriate row in the userbase table
+	// The final step is to add the user to the appropriate row in the userbase table
 	userbaseQuery := fmt.Sprintf(
 		"INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, params.ClientID,
 	)
@@ -194,14 +194,14 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
 func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string, error) {
-	// get the credentials from the database
+	// Get the credentials from the database
 	connectionParams, err := GetUserConnection(db, fromUserID, platform)
 
 	if err != nil {
 		return "", "", err
 	}
 
-	// since we know we are going for tokens, parse them out of the connection struct
+	// Since we know we are going for tokens, parse them out of the connection struct
 	if connectionParams.ConnectionType != "oauth2" {
 		return "", "", errors.New("expected Oauth2 authentication type, was instead " + connectionParams.ConnectionType)
 	}
@@ -312,12 +312,10 @@ func CheckClientName(db *sql.DB, name string) (int, error) {
 	}
 
 	return userId, nil
-
 }
 
 func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
-
-	// before we insert the password in the database, we must hash it
+	// Before we insert the password in the database, we must hash it
 	// bcrypt salts this for us, so we don't have to worry about it
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
@@ -336,11 +334,9 @@ func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
 	}
 
 	return clientID, nil
-
 }
 
 func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) {
-
 	searchQuery := fmt.Sprintf("SELECT password, id FROM client WHERE name = '%s'", name)
 
 	var passwordResult string
@@ -356,19 +352,18 @@ func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) 
 	}
 
 	return userId, nil
-
 }
 
 func parseConnectionString(connectionString string) (Connection, error) {
 	returnedConnection := Connection{}
 
-	// split the Connection string into it's components
+	// Split the Connection string into it's components
 	connectionParams := strings.Split(connectionString, ";")
 
-	// check what type of Connection string this is
+	// Check what type of Connection string this is
 	switch connectionParams[0] {
 	case "oauth2":
-		// this is an oauth2 Connection, so we will need an access and refresh token
+		// This is an oauth2 Connection, so we will need an access and refresh token
 		params := make(map[string]string)
 		params["access_token"] = connectionParams[1]
 		params["refresh_token"] = connectionParams[2]
@@ -377,7 +372,7 @@ func parseConnectionString(connectionString string) (Connection, error) {
 		returnedConnection.Parameters = params
 		return returnedConnection, nil
 	default:
-		// this is not a supported Connection type, bad data in the database
+		// This is not a supported Connection type, bad data in the database
 		return returnedConnection, errors.New("Connection type '" + connectionParams[0] + "' unsupported")
 	}
 }
