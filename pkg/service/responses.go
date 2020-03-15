@@ -38,3 +38,9 @@ type ClientSignInResponse struct {
 	ClientID int    `json:"userID,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
+
+type CallbackUpdateResponse struct {
+	Success         bool   `json:"success"`
+	Error           string `json:"error,omitempty"`
+	UpdatedCallback string `json:"updatedCallback,omitempty"`
+}

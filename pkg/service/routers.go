@@ -133,6 +133,15 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.Marath
 		},
 
 		Route{
+			"Callback",
+			"POST",
+			"/client/{clientID}/callback",
+			false,
+			true,
+			api.UpdateClientCallback,
+		},
+
+		Route{
 			"SignUp",
 			"POST",
 			"/signup",

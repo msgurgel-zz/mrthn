@@ -422,11 +422,40 @@ func TestGetUserInUserbase_ShouldReturnUserID(t *testing.T) {
 
 	// call the function we are testing
 	userIDActual, err := GetUserInUserbase(DB, userID, clientID)
-
 	if err != nil {
 		t.Errorf("error was not expected when adding a userID to a client userbase: %s", err)
 	}
-
 	assert.Equal(t, userID, userIDActual)
+}
 
+func TestUpdateClientCallback_ShouldReturnSuccess(t *testing.T) {
+	clientId := 1
+	clientCallback := "BrandNewCallback"
+	// Mock SQL rows
+	cols := []string{
+		"id",
+	}
+
+	rows := sqlmock.NewRows(cols).AddRow(clientId)
+	checkQuery := fmt.Sprintf("SELECT id FROM client WHERE id = %d", clientId)
+
+	// Expect the query to search for the clientID
+	Mock.ExpectQuery(checkQuery).WillReturnRows(rows)
+
+	// Expect the query to update the client callback
+	Mock.ExpectExec(fmt.Sprintf("UPDATE client SET callback = '%s' WHERE id = %d", clientCallback, clientId)).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Call the method we are testing
+	result, err := UpdateCallback(DB, clientId, clientCallback)
+	// Assertions
+	if err != nil {
+		t.Errorf("error was not expected when updating client callback: %s", err)
+	}
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Assert that that update passed. (result is true)
+	assert.Equal(t, true, result)
 }

@@ -114,4 +114,52 @@ class SandwichTest < Minitest::Test
         assert_equal false, parsed["success"]
         assert_equal 'Incorrect password', parsed["error"]
     end
+
+    def test_client_update_callback_incorrect_client
+            response = HTTParty.post('http://localhost:8080/client/34/callback', {
+                :body => {
+                    :callback => 'Sandwich'
+                },
+                :headers => {
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                    'Origin' => 'https://marathon-18119.firebaseapp.com'
+                }
+            })
+            parsed = JSON.parse(response.body)
+
+            assert_equal false, parsed["success"]
+            assert_equal 'clientID does not match any registered client', parsed["error"]
+    end
+
+    def test_client_update_callback_non_integer_clientID
+                response = HTTParty.post('http://localhost:8080/client/notaninteger/callback', {
+                    :body => {
+                        :callback => 'Sandwich'
+                    },
+                    :headers => {
+                        'Content-Type' => 'application/x-www-form-urlencoded',
+                        'Origin' => 'https://marathon-18119.firebaseapp.com'
+                    }
+                })
+                parsed = JSON.parse(response.body)
+
+                assert_equal false, parsed["success"]
+                assert_equal 'clientID must be an integer', parsed["error"]
+    end
+
+    def test_client_update_callback_correct_call
+                    response = HTTParty.post('http://localhost:8080/client/1/callback', {
+                        :body => {
+                            :callback => 'Sandwich_callback'
+                        },
+                        :headers => {
+                            'Content-Type' => 'application/x-www-form-urlencoded',
+                            'Origin' => 'https://marathon-18119.firebaseapp.com'
+                        }
+                    })
+                    parsed = JSON.parse(response.body)
+
+                    assert_equal true, parsed["success"]
+                    assert_equal 'Sandwich_callback', parsed["updatedCallback"]
+        end
 end
