@@ -28,7 +28,7 @@ sleep 1 # Give the server time to start
 curl -s "http://localhost:8080/get-token?id=1" -H "Origin: https://marathon-18119.firebaseapp.com"> token.txt
 
 # Run mock third-party server
-rackup integration/sandwich/server/config.ru > log/server.log 2>&1 &
+rackup integration/sandwich/server/config.ru > log/test-server.log 2>&1 &
 SERVER_PID=$!
 
 sleep 1 # Give the server time to start

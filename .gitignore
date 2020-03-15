@@ -1,6 +1,5 @@
 .idea/
 .env
 .DS_Store
-runtime.log
 log/
 vendor/
