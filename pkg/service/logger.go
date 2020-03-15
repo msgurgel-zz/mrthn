@@ -10,6 +10,7 @@ package service
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -20,11 +21,13 @@ func SetupLogger(logToStderr bool) *logrus.Logger {
 
 	if !logToStderr {
 		// Create file to store logs
-		file, err := os.OpenFile("runtime.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logDir := filepath.Join(".", "log")
+		_ = os.MkdirAll(logDir, 0700)
+		file, err := os.OpenFile("log/marathon.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err == nil {
 			logger.Out = file
 		} else {
-			logger.Info("Failed to log to file, using default stderr")
+			logger.Infof("Failed to log to file, using default stderr - err: %s", err)
 		}
 	}
 
