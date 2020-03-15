@@ -441,6 +441,104 @@ func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 	api.respondWithJSON(w, http.StatusBadRequest, response)
 }
 
+func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "Error occurred while attempting to parse form values",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "UpdateClientCallback",
+			"err":  err,
+		}).Error("failed to parse request form values")
+
+		return
+	}
+	
+	newCallback := r.Form.Get("callback")
+	if newCallback == "" {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "Expected parameter 'name' in request",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "UpdateClientCallback",
+			"err":  "form parameter 'callback' was missing in request",
+		}).Error("failed to parse client 'callback' parameter")
+
+		return
+	}
+	
+	vars := mux.Vars(r)
+	if vars["clientID"] == "" {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "missing clientID",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "UpdateClientCallback",
+			"err":  "clientID not received",
+		}).Error("failed to parse client 'clientID' parameter")
+	}
+	
+	clientID, err := strconv.Atoi(vars["clientID"])
+	if err != nil {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "clientID must be an integer",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func":     "UpdateClientCallback",
+			"err":      "clientID received must be an integer",
+			"received": vars["clientID"],
+		}).Error("failed to parse client 'clientID' parameter")
+
+		return
+	}
+	
+	// We have the new callback so now update the client with it
+	result, err := dal.UpdateCallback(api.db, clientID, newCallback)
+	if err != nil {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "error occurred while updating client callback",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "UpdateClientCallback",
+			"err":  err,
+		}).Error("failed to update client callback")
+		
+		return
+	}
+
+	if !result {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "clientID does not match any registered client",
+		}
+
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+		return
+	}
+	
+	response := CallbackUpdateResponse{
+		Success:         true,
+		UpdatedCallback: newCallback,
+	}
+	api.respondWithJSON(w, http.StatusInternalServerError, response)
+}
+
 // Private Functions
 
 func (api *Api) sendAuthorizationResult(w http.ResponseWriter, r *http.Request, userId int, Callback string) {

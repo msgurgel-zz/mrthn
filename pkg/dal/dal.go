@@ -40,8 +40,7 @@ func InitializeDBConn(connectionString string) (*sql.DB, error) {
 }
 
 func InsertSecretInExistingClient(db *sql.DB, clientID int, secret []byte) (int64, error) {
-	// TODO: Use ExecContext instead
-	result, err := db.Exec(
+	result, err := db.Exec( // TODO: Use ExecContext instead
 		`UPDATE client
 				SET secret = $1
 				WHERE id = $2`,
@@ -84,7 +83,7 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			// there were no rows, but otherwise no error occurred.
+			// There were no rows, but otherwise no error occurred.
 			// Return a zero
 			return 0, nil
 		} else {
@@ -99,7 +98,6 @@ func AddUserToUserbase(db *sql.DB, userID int, clientID int) error {
 	queryString := fmt.Sprintf("INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, clientID)
 
 	_, err := db.Exec(queryString)
-
 	if err != nil {
 		return err
 	}
@@ -116,10 +114,9 @@ func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
 	)
 
 	err := db.QueryRow(queryString).Scan(&userID)
-
 	if err != nil {
 		if err == sql.ErrNoRows {
-			// there were no rows, but otherwise no error occurred.
+			// There were no rows, but otherwise no error occurred.
 			// Return a zero
 			return 0, nil
 		} else {
@@ -141,7 +138,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	// We need to either commit or rollback the transaction after it is done.
 	defer func() {
 		if err != nil {
-			// something went wrong, rollback the transaction
+			// Something went wrong, rollback the transaction
 			tx.Rollback()
 		} else {
 			err = tx.Commit()
@@ -151,7 +148,6 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	// The first thing we need to do is to create a new user in the user table
 	var userID int
 	err = tx.QueryRow(`INSERT INTO "user" DEFAULT VALUES RETURNING id`).Scan(&userID)
-
 	if err != nil {
 		return 0, err
 	}
@@ -174,6 +170,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		params.UPID,
 		params.ConnectionString,
 	)
+
 	_, err = tx.Exec(credentialsQuery)
 	if err != nil {
 		return 0, err
@@ -183,8 +180,8 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	userbaseQuery := fmt.Sprintf(
 		"INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, params.ClientID,
 	)
-	_, err = tx.Exec(userbaseQuery)
 
+	_, err = tx.Exec(userbaseQuery)
 	if err != nil {
 		return 0, err
 	}
@@ -196,7 +193,6 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string, error) {
 	// Get the credentials from the database
 	connectionParams, err := GetUserConnection(db, fromUserID, platform)
-
 	if err != nil {
 		return "", "", err
 	}
@@ -212,6 +208,7 @@ func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string,
 func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
 	// Get ID of platform using platform's name
 	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", platformName)
+
 	var platformID int
 	err := db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
@@ -248,8 +245,7 @@ func GetPlatformNames(db *sql.DB, fromUserID int) ([]string, error) {
 		fromUserID,
 	)
 
-	// TODO: Use QueryRowContext instead
-	rows, err := db.Query(stmt)
+	rows, err := db.Query(stmt) // TODO: Use QueryRowContext instead
 	if err != nil {
 		return nil, err
 	}
@@ -297,14 +293,12 @@ func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
 // or 0 if no client is using that name
 func CheckClientName(db *sql.DB, name string) (int, error) {
 	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name = '%s'", name)
-
 	var userId int
-	// TODO: Use QueryRowContext instead
-	err := db.QueryRow(searchQuery).Scan(&userId)
+	err := db.QueryRow(searchQuery).Scan(&userId) // TODO: Use QueryRowContext instead
 	if err != nil {
 		if err == sql.ErrNoRows {
-			// there were no rows, but otherwise no error occurred.
-			// that means this name isn't being used in the database
+			// There were no rows, but otherwise no error occurred.
+			// That means this name isn't being used in the database
 			return 0, nil
 		} else {
 			return 0, err
@@ -318,17 +312,13 @@ func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
 	// Before we insert the password in the database, we must hash it
 	// bcrypt salts this for us, so we don't have to worry about it
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-
 	if err != nil {
 		return 0, err
 	}
-
 	var clientID int
 	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s') RETURNING id", name, hash)
-
 	// TODO: Use ExecContext instead
 	err = db.QueryRow(insertQuery).Scan(&clientID)
-
 	if err != nil {
 		return 0, err
 	}
@@ -338,20 +328,50 @@ func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
 
 func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) {
 	searchQuery := fmt.Sprintf("SELECT password, id FROM client WHERE name = '%s'", name)
-
 	var passwordResult string
 	var userId int
 	err := db.QueryRow(searchQuery).Scan(&passwordResult, &userId)
 	if err != nil {
 		return 0, err
 	}
-
 	err = bcrypt.CompareHashAndPassword([]byte(passwordResult), []byte(enteredPassword))
 	if err != nil {
 		return userId, err
 	}
-
 	return userId, nil
+}
+
+func UpdateCallback(db *sql.DB, clientID int, newCallback string) (bool, error) {
+	clientIDcheck, err := checkClientExistence(db, clientID)
+	if err != nil {
+		return false, err
+	}
+	if clientIDcheck {
+		// Update the client callback
+		updateString := fmt.Sprintf("UPDATE client SET callback = '%s' WHERE id = %d", newCallback, clientID)
+		_, err := db.Exec(updateString)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func checkClientExistence(db *sql.DB, clientID int) (bool, error) {
+	clientQuery := fmt.Sprintf("SELECT id FROM client WHERE  id = %d", clientID)
+
+	var clientIDresult int
+	err := db.QueryRow(clientQuery).Scan(&clientIDresult)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// There were no rows, but otherwise no error occurred
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func parseConnectionString(connectionString string) (Connection, error) {
