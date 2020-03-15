@@ -24,6 +24,7 @@ func generateJWT(clientID int, secret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		// TODO: Make client ID not an integer
 		Audience: strconv.Itoa(clientID),
+		Issuer:   "Marathon",
 	})
 
 	// TODO: Add expiration to the token
