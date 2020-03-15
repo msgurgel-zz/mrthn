@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e # Any subsequent(*) commands which fail will cause the shell script to exit immediately
 
 # ======= BEFORE RUNNING THIS SCRIPT =======
 # 1. Make sure to run 'bundle install' on the both ruby app directories (integration/sandwich & integration/sandwich/server)
@@ -7,14 +8,14 @@
 #   ./integration/integration-test.sh
 
 # Get database environment values
-source ./integration/setup-db-env-vars.sh
+source ./.env
 
 # Create log directory
 mkdir -p log
 
 # Run setup database script
-psql -a -d $PGDATABASE -f integration/sql/clear-db.sql > log/db_script.log
-psql -a -d $PGDATABASE -f integration/sql/setup-db.sql > log/db_script.log
+psql -a $DB_CONNECTION_STRING -f integration/sql/clear-db.sql > log/db_script.log
+psql -a $DB_CONNECTION_STRING -f integration/sql/setup-db.sql > log/db_script.log
 
 # Build and run Marathon
 go build "$GOPATH"/src/github.com/msgurgel/marathon/cmd/marathon
@@ -43,4 +44,4 @@ rm ./marathon
 rm ./token.txt
 
 # Clear database
-psql -a -d $PGDATABASE -f integration/sql/clear-db.sql > log/db_script.log
+psql -a $DB_CONNECTION_STRING -f integration/sql/clear-db.sql > log/db_script.log
