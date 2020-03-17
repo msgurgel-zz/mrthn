@@ -36,6 +36,13 @@ func InitializePlatforms(db *sql.DB, log *logrus.Logger, authTypes auth.Types) {
 		domain:        domains["fitbit"],
 		authorization: authTypes.Oauth2.Configs["fitbit"],
 	}
+
+	Platforms["google"] = Google{
+		db:            db,
+		log:           log,
+		domain:        domains["google"],
+		authorization: authTypes.Oauth2.Configs["google"],
+	}
 }
 
 func GetPlatforms(platformNames []string) []Platform {

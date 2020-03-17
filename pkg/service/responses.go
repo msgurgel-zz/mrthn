@@ -18,7 +18,7 @@ type GetUserStepsResponse struct {
 
 type GetUserCaloriesResponse struct {
 	ID       int                 `json:"id,omitempty"`
-	Calories []model.ValueResult `json:"steps,omitempty"`
+	Calories []model.ValueResult `json:"calories,omitempty"`
 }
 
 type GetUserDistanceResponse struct {

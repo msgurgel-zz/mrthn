@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/msgurgel/marathon/pkg/environment"
-
 	"golang.org/x/oauth2/endpoints"
 
 	"golang.org/x/oauth2"
@@ -41,6 +42,15 @@ type StateKeys struct {
 	URL      string
 	Callback string
 	ClientID int
+}
+
+// UserProfileResponse is a json structure representing the response of calling the users google profile
+// Only used when creating a new user and switching the tokens
+type UserProfileResponse struct {
+	EmailAddress  string `json:"emailAddress"`
+	MessagesTotal int    `json:"messagesTotal,omitempty"`
+	ThreadsTotal  int    `json:"threadsTotal,omitempty"`
+	HistoryID     string `json:"historyId,omitempty"`
 }
 
 func NewOAuth2(configs *environment.MarathonConfig) OAuth2 {
@@ -74,7 +84,7 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 
 	if err == nil {
 		// This was an expected request.
-		// depending on what service was called, exchanging the code for the tokens may work slightly differently
+		// Depending on what service was called, exchanging the code for the tokens may work slightly differently
 		switch ReturnedState.Platform {
 		case "fitbit":
 			// exchange the code received for an access and refresh token
@@ -84,7 +94,7 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 				return OAuth2Result{Callback: ReturnedState.Callback}, err
 			} else {
 
-				// return the tokens! If we need more values, such as the expiry date, we can return more here
+				// Return the tokens! If we need more values, such as the expiry date, we can return more here
 				return OAuth2Result{
 					Token:        token,
 					ClientID:     ReturnedState.ClientID,
@@ -94,6 +104,49 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 				}, err
 
 			}
+		case "google":
+			// Exchange the code received for an access and refresh token
+			tokens, err := o.Configs["google"].Exchange(context.Background(), code)
+			if err != nil {
+				return OAuth2Result{Callback: ReturnedState.Callback}, err
+			}
+
+			// Return the tokens! If we need more values, such as the expiry date, we can return more here
+			googleOauth2Result := OAuth2Result{
+				Token:        tokens,
+				ClientID:     ReturnedState.ClientID,
+				PlatformName: ReturnedState.Platform,
+				Callback:     ReturnedState.Callback,
+			}
+
+			// Before we can return the result, we need to find out the users email address
+			req, err := http.NewRequest("GET", "https://www.googleapis.com/gmail/v1/users/me/profile", nil)
+			req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
+
+			client := o.Configs["google"].Client(context.Background(), tokens)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return googleOauth2Result, err
+			}
+
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return googleOauth2Result, err
+			}
+
+			// Unmarshal the JSON response into a google user profile response
+			userProfile := UserProfileResponse{}
+			err = json.Unmarshal(body, &userProfile)
+			if err != nil {
+				return googleOauth2Result, err
+			}
+
+			// Put the users email into the oauth2 result
+			googleOauth2Result.PlatformID = userProfile.EmailAddress
+
+			return googleOauth2Result, err
+
 		default:
 			return OAuth2Result{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Platform + " service does not exist")
 		}
@@ -117,7 +170,13 @@ func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID 
 		stateString := createStateString(service)
 
 		ReturnedKeys.State = []byte(stateString)
-		ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
+
+		if service == "google" {
+			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString, oauth2.AccessTypeOffline)
+		} else {
+			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
+		}
+
 		ReturnedKeys.Callback = callbackURL
 		ReturnedKeys.ClientID = clientID
 
@@ -149,6 +208,14 @@ func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2
 		ClientSecret: configs.Fitbit.ClientSecret,
 		Scopes:       []string{"activity", "profile", "settings", "heartrate"},
 		Endpoint:     endpoints.Fitbit,
+	}
+
+	OAuthConfigs["google"] = &oauth2.Config{
+		RedirectURL:  configs.Callback,
+		ClientID:     configs.Google.ClientID,
+		ClientSecret: configs.Google.ClientSecret,
+		Scopes:       []string{"https://www.googleapis.com/auth/fitness.activity.read", "https://www.googleapis.com/auth/fitness.location.read", "https://www.googleapis.com/auth/gmail.readonly"},
+		Endpoint:     endpoints.Google,
 	}
 
 	return OAuthConfigs

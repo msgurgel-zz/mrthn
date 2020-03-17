@@ -623,76 +623,74 @@ func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userI
 }
 
 func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
-	// Check what kind of service this user is being created for
-	switch Oauth2Params.PlatformName {
-	case "fitbit":
-		// Before we create the user, check the id to see if its in the database
-		userID, err := dal.GetUserByPlatformID(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
+
+	// Before we create the user, check the id to see if its in the database
+	userID, err := dal.GetUserByPlatformID(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
+	if err != nil {
+		return 0, err
+	}
+
+	if userID != 0 {
+		// This user already exists in the Marathon User table.
+		// However, the user may not exist in the clients userbase.
+		// Check if they do.
+		userID, err := dal.GetUserInUserbase(db, userID, Oauth2Params.ClientID)
 		if err != nil {
 			return 0, err
 		}
 
-		if userID != 0 {
-			// This user already exists in the Marathon User table.
-			// However, the user may not exist in the clients userbase.
-			// Check if they do.
-			userID, err := dal.GetUserInUserbase(db, userID, Oauth2Params.ClientID)
+		if userID == 0 {
+			// The user exists, but is not in the clients userbase. Add it.
+			err := dal.AddUserToUserbase(db, userID, Oauth2Params.ClientID)
 			if err != nil {
 				return 0, err
 			}
 
-			if userID == 0 {
-				// The user exists, but is not in the clients userbase. Add it.
-				err := dal.AddUserToUserbase(db, userID, Oauth2Params.ClientID)
-				if err != nil {
-					return 0, err
-				}
-
-				return userID, nil
-			}
-
-			// The user already exists both in Marathon, and in the client's userbase.
-			// What are we doing here? It's over. Go home.
 			return userID, nil
 		}
 
-		// Create the credentials for the user
-		var connectionParams = []string{
-			"oauth2",
-			Oauth2Params.Token.TokenType,
-			Oauth2Params.Token.Expiry.Format(helpers.ISO8601Layout),
-			Oauth2Params.Token.AccessToken,
-			Oauth2Params.Token.RefreshToken,
-		}
-		connStr, err := helpers.FormatConnectionString(connectionParams)
-		if err != nil {
-			return 0, err
-		}
-
-		params := dal.CredentialParams{
-			ClientID:         Oauth2Params.ClientID,
-			PlatformName:     Oauth2Params.PlatformName,
-			UPID:             Oauth2Params.PlatformID,
-			ConnectionString: connStr,
-		}
-		userID, err = dal.InsertUserCredentials(db, params)
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"err": err,
-			}).Error("failed to create a new fitbit user")
-
-			return 0, err
-		}
-
-		log.WithFields(logrus.Fields{
-			"userID": userID,
-		}).Info("new fitbit user created")
-
+		// The user already exists both in Marathon, and in the client's userbase.
+		// What are we doing here? It's over. Go home.
 		return userID, nil
-	default:
-		return 0, errors.New(Oauth2Params.PlatformName + " service does not exist")
 	}
+
+	// Create the credentials for the user
+	var connectionParams = []string{
+		"oauth2",
+		Oauth2Params.Token.TokenType,
+		Oauth2Params.Token.Expiry.Format(helpers.ISO8601Layout),
+		Oauth2Params.Token.AccessToken,
+		Oauth2Params.Token.RefreshToken,
+	}
+	connStr, err := helpers.FormatConnectionString(connectionParams)
+	if err != nil {
+		return 0, err
+	}
+
+	params := dal.CredentialParams{
+		ClientID:         Oauth2Params.ClientID,
+		PlatformName:     Oauth2Params.PlatformName,
+		UPID:             Oauth2Params.PlatformID,
+		ConnectionString: connStr,
+	}
+	userID, err = dal.InsertUserCredentials(db, params)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"err":      err,
+			"platform": Oauth2Params.PlatformName,
+		}).Error("failed to create a new user")
+
+		return 0, err
+	}
+
+	log.WithFields(logrus.Fields{
+		"userID":   userID,
+		"platform": Oauth2Params.PlatformName,
+	}).Info("new user created")
+
+	return userID, nil
+
 }
 
 func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {
