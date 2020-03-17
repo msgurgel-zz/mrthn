@@ -16,7 +16,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -610,8 +609,14 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		}
 
 		// Create the credentials for the user
-		var connectionParams = []string{"oauth2", Oauth2Params.AccessToken, Oauth2Params.RefreshToken}
-		connStr, err := formatConnectionString(connectionParams)
+		var connectionParams = []string{
+			"oauth2",
+			Oauth2Params.Token.TokenType,
+			Oauth2Params.Token.Expiry.Format(helpers.ISO8601Layout),
+			Oauth2Params.Token.AccessToken,
+			Oauth2Params.Token.RefreshToken,
+		}
+		connStr, err := helpers.FormatConnectionString(connectionParams)
 		if err != nil {
 			return 0, err
 		}
@@ -640,19 +645,6 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 	default:
 		return 0, errors.New(Oauth2Params.PlatformName + " service does not exist")
 	}
-}
-
-func formatConnectionString(connectionParams []string) (string, error) {
-	if len(connectionParams) == 0 {
-		return "", errors.New("must contain non zero amount of Connection parameters")
-	}
-
-	var sb strings.Builder
-	for _, param := range connectionParams {
-		sb.WriteString(param + ";")
-	}
-
-	return sb.String(), nil
 }
 
 func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {

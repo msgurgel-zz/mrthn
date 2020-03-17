@@ -25,8 +25,7 @@ type OAuth2 struct {
 }
 
 type OAuth2Result struct {
-	AccessToken  string
-	RefreshToken string
+	Token        *oauth2.Token
 	ClientID     int
 	PlatformName string
 	Callback     string
@@ -87,8 +86,7 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
 				return OAuth2Result{
-					AccessToken:  token.AccessToken,
-					RefreshToken: token.RefreshToken,
+					Token:        token,
 					ClientID:     ReturnedState.ClientID,
 					PlatformName: ReturnedState.Platform,
 					Callback:     ReturnedState.Callback,
@@ -128,6 +126,17 @@ func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID 
 	}
 
 	return ReturnedKeys, nil
+}
+
+func RefreshOAuth2Tokens(tokens *oauth2.Token, conf *oauth2.Config) (*oauth2.Token, error) {
+	// Attempt to refresh token
+	tokenSource := conf.TokenSource(context.Background(), tokens)
+	newTokens, err := tokenSource.Token()
+	if err != nil {
+		return nil, errors.New("failed to refresh token: " + err.Error())
+	}
+
+	return newTokens, nil
 }
 
 func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {

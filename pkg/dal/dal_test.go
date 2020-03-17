@@ -6,6 +6,10 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/msgurgel/marathon/pkg/helpers"
+	"golang.org/x/oauth2"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -99,12 +103,12 @@ func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 	cols := []string{
 		"connection_string",
 	}
-	rows := sqlmock.NewRows(cols).AddRow("oauth2;AC3$$T0K3N;R3FR3$HT0K3N")
+	rows := sqlmock.NewRows(cols).AddRow("oauth2;Bearer;2020-03-23T04:20:00-0400;AC3$$T0K3N;R3FR3$HT0K3N;")
 
 	expectedSQL := fmt.Sprintf("^SELECT connection_string FROM credentials WHERE user_id = %d AND platform_id = %d$", userID, platformID)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
-	accessTkn, refreshTkn, err := GetUserTokens(DB, userID, platformName)
+	tokens, err := GetUserTokens(DB, userID, platformName)
 	if err != nil {
 		t.Errorf("failed to get user tokens: %s", err.Error())
 		return
@@ -115,8 +119,8 @@ func TestGetUserTokens_ShouldGetTokens(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 
-	assert.Equal(t, "AC3$$T0K3N", accessTkn)
-	assert.Equal(t, "R3FR3$HT0K3N", refreshTkn)
+	assert.Equal(t, "AC3$$T0K3N", tokens.AccessToken)
+	assert.Equal(t, "R3FR3$HT0K3N", tokens.RefreshToken)
 }
 
 func TestGetPlatformNames(t *testing.T) {
@@ -236,7 +240,7 @@ func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
 	userID := 1
 	platID := 1
 	platName := "fitbit"
-	connStr := "oauth2;AC3$$T0K3N;R3FR3$HT0K3N"
+	connStr := "oauth2;Bearer;2020-03-23T04:20:00-0400;AC3$$T0K3N;R3FR3$HT0K3N;"
 
 	platformIDQuery := fmt.Sprintf("^SELECT id FROM platform WHERE name = '%s'$", platName)
 	Mock.ExpectQuery(platformIDQuery).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
@@ -266,6 +270,8 @@ func TestGetUserConnection_ShouldGetConnection(t *testing.T) {
 		Parameters: map[string]string{
 			"access_token":  "AC3$$T0K3N",
 			"refresh_token": "R3FR3$HT0K3N",
+			"expiry":        "2020-03-23T04:20:00-0400",
+			"token_type":    "Bearer",
 		},
 	}
 	assert.Equal(t, expectedResult, actualUserConnection)
@@ -429,24 +435,24 @@ func TestGetUserInUserbase_ShouldReturnUserID(t *testing.T) {
 }
 
 func TestUpdateClientCallback_ShouldReturnSuccess(t *testing.T) {
-	clientId := 1
+	clientID := 1
 	clientCallback := "BrandNewCallback"
 	// Mock SQL rows
 	cols := []string{
 		"id",
 	}
 
-	rows := sqlmock.NewRows(cols).AddRow(clientId)
-	checkQuery := fmt.Sprintf("SELECT id FROM client WHERE id = %d", clientId)
+	rows := sqlmock.NewRows(cols).AddRow(clientID)
+	checkQuery := fmt.Sprintf("SELECT id FROM client WHERE id = %d", clientID)
 
 	// Expect the query to search for the clientID
 	Mock.ExpectQuery(checkQuery).WillReturnRows(rows)
 
 	// Expect the query to update the client callback
-	Mock.ExpectExec(fmt.Sprintf("UPDATE client SET callback = '%s' WHERE id = %d", clientCallback, clientId)).WillReturnResult(sqlmock.NewResult(1, 1))
+	Mock.ExpectExec(fmt.Sprintf("UPDATE client SET callback = '%s' WHERE id = %d", clientCallback, clientID)).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	// Call the method we are testing
-	result, err := UpdateCallback(DB, clientId, clientCallback)
+	result, err := UpdateCallback(DB, clientID, clientCallback)
 	// Assertions
 	if err != nil {
 		t.Errorf("error was not expected when updating client callback: %s", err)
@@ -458,4 +464,72 @@ func TestUpdateClientCallback_ShouldReturnSuccess(t *testing.T) {
 
 	// Assert that that update passed. (result is true)
 	assert.Equal(t, true, result)
+}
+
+func TestUpdateCredentials_ShouldUpdateCredentials(t *testing.T) {
+	userID := 1
+	credentialStr := "oauth2;type;expiry;access;refresh;"
+
+	Mock.ExpectExec(fmt.Sprintf(
+		"^UPDATE credentials SET connection_string = '%s' WHERE user_id = %d$",
+		credentialStr,
+		userID,
+	)).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Call the method we are testing
+	err := UpdateCredentials(DB, userID, credentialStr)
+
+	// Assertions
+	if err != nil {
+		t.Errorf("error was not expected when updating credentials: %s", err)
+	}
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Assert that that update worked
+	assert.Nil(t, err)
+}
+
+func TestUpdateCredentialsUsingOAuth2Tokens_ShouldUpdateCredentials(t *testing.T) {
+	userID := 1
+	expiryStr := "2020-03-23T04:20:00-0400"
+	expiryDate, _ := time.Parse(helpers.ISO8601Layout, expiryStr)
+
+	tokens := &oauth2.Token{
+		AccessToken:  "access",
+		TokenType:    "Bearer",
+		RefreshToken: "refresh",
+		Expiry:       expiryDate,
+	}
+
+	credentialStr := fmt.Sprintf(
+		"oauth2;%s;%s;%s;%s;",
+		tokens.TokenType,
+		tokens.Expiry.Format(helpers.ISO8601Layout),
+		tokens.AccessToken,
+		tokens.RefreshToken,
+	)
+
+	Mock.ExpectExec(fmt.Sprintf(
+		"^UPDATE credentials SET connection_string = '%s' WHERE user_id = %d$",
+		credentialStr,
+		userID,
+	)).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Call the method we are testing
+	err := UpdateCredentialsUsingOAuth2Tokens(DB, userID, tokens)
+
+	// Assertions
+	if err != nil {
+		t.Errorf("error was not expected when updating credentials: %s", err)
+	}
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Assert that that update worked
+	assert.Nil(t, err)
 }
