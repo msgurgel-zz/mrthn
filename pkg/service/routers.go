@@ -11,9 +11,9 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/rs/cors"
+	"github.com/msgurgel/marathon/pkg/auth"
 
-	"github.com/msgurgel/marathon/pkg/environment"
+	"github.com/rs/cors"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"

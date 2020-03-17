@@ -16,14 +16,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/dal"
-
 	"github.com/msgurgel/marathon/pkg/platform"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/msgurgel/marathon/pkg/auth"
+	"github.com/msgurgel/marathon/pkg/dal"
 	"github.com/msgurgel/marathon/pkg/environment"
-
 	"github.com/msgurgel/marathon/pkg/service"
 )
 
@@ -100,8 +99,8 @@ func main() {
 
 	c := make(chan os.Signal, 1)
 
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
+	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C) or SIGTERM (Ctrl+/)
+	// SIGKILL or SIGQUIT will not be caught.
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 
 	// Block until we receive our signal.

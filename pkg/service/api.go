@@ -235,7 +235,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 			"func":  "Callback",
 			"err":   err,
 			"state": r.FormValue("state"),
-		}).Error("failed to retrieve Oauth2 token for user")
+		}).Error("failed to retrieve OAuth2 token for user")
 		api.sendAuthorizationResult(w, r, 0, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
 
 		return
@@ -457,7 +457,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	newCallback := r.Form.Get("callback")
 	if newCallback == "" {
 		response := CallbackUpdateResponse{
@@ -473,7 +473,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	vars := mux.Vars(r)
 	if vars["clientID"] == "" {
 		response := CallbackUpdateResponse{
@@ -487,7 +487,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 			"err":  "clientID not received",
 		}).Error("failed to parse client 'clientID' parameter")
 	}
-	
+
 	clientID, err := strconv.Atoi(vars["clientID"])
 	if err != nil {
 		response := CallbackUpdateResponse{
@@ -504,7 +504,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	// We have the new callback so now update the client with it
 	result, err := dal.UpdateCallback(api.db, clientID, newCallback)
 	if err != nil {
@@ -518,7 +518,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 			"func": "UpdateClientCallback",
 			"err":  err,
 		}).Error("failed to update client callback")
-		
+
 		return
 	}
 
@@ -531,7 +531,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 		api.respondWithJSON(w, http.StatusBadRequest, response)
 		return
 	}
-	
+
 	response := CallbackUpdateResponse{
 		Success:         true,
 		UpdatedCallback: newCallback,

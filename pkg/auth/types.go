@@ -5,7 +5,7 @@ import (
 )
 
 type Types struct {
-	Oauth2 Oauth2
+	Oauth2 OAuth2
 }
 
 func (a *Types) GetAuthTypes(configs *environment.MarathonConfig) {
