@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/auth"
+
 	"github.com/msgurgel/marathon/pkg/dal"
 
 	"github.com/sirupsen/logrus"
@@ -18,7 +20,7 @@ type Platform interface {
 	GetDistance(user int, date time.Time) (float64, error)
 }
 
-func InitializePlatforms(db *sql.DB, log *logrus.Logger) {
+func InitializePlatforms(db *sql.DB, log *logrus.Logger, authTypes auth.Types) {
 	domains, err := dal.GetPlatformDomains(db)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -28,7 +30,12 @@ func InitializePlatforms(db *sql.DB, log *logrus.Logger) {
 
 	Platforms = make(map[string]Platform)
 
-	Platforms["fitbit"] = Fitbit{db: db, log: log, domain: domains["fitbit"]}
+	Platforms["fitbit"] = Fitbit{
+		db:            db,
+		log:           log,
+		domain:        domains["fitbit"],
+		authorization: authTypes.Oauth2.Configs["fitbit"],
+	}
 }
 
 func GetPlatforms(platformNames []string) []Platform {

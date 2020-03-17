@@ -24,7 +24,6 @@ import (
 
 	"github.com/msgurgel/marathon/pkg/auth"
 	"github.com/msgurgel/marathon/pkg/dal"
-	"github.com/msgurgel/marathon/pkg/environment"
 	"github.com/msgurgel/marathon/pkg/helpers"
 	"github.com/msgurgel/marathon/pkg/model"
 )
@@ -35,14 +34,12 @@ type Api struct {
 	db          *sql.DB
 }
 
-func NewApi(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) Api {
-	api := Api{
-		log: logger,
-		db:  db,
+func NewApi(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Api {
+	return Api{
+		log:         logger,
+		db:          db,
+		authMethods: authTypes,
 	}
-	api.authMethods.GetAuthTypes(config)
-
-	return api
 }
 
 func (api *Api) Index(w http.ResponseWriter, r *http.Request) {

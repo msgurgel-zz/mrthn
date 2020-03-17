@@ -30,8 +30,8 @@ type Route struct {
 
 type Routes []Route
 
-func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) *mux.Router {
-	routes := prepareRoutes(db, logger, config)
+func NewRouter(db *sql.DB, logger *logrus.Logger, authTypes auth.Types, marathonWebsiteURL string) *mux.Router {
+	routes := prepareRoutes(db, logger, authTypes)
 	router := mux.NewRouter().StrictSlash(true)
 
 	// Initialize routes
@@ -46,7 +46,7 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonCo
 
 		// Check Marathon Website Origin Middleware
 		if route.MarathonWebsiteOnly {
-			handler = checkMarathonURL(logger, handler, config.MarathonWebsiteURL)
+			handler = checkMarathonURL(logger, handler, marathonWebsiteURL)
 		}
 
 		// CORS Middleware
@@ -65,8 +65,8 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, config *environment.MarathonCo
 	return router
 }
 
-func prepareRoutes(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) Routes {
-	api := NewApi(db, logger, config)
+func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Routes {
+	api := NewApi(db, logger, authTypes)
 
 	routes := Routes{
 		Route{

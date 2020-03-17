@@ -73,11 +73,16 @@ func main() {
 
 	defer db.Close()
 
+	// Setup authentication methods
+	authTypes := auth.ConfigureTypes(env)
+
 	// Setup connections to platforms
-	platform.InitializePlatforms(db, log)
+	platform.InitializePlatforms(db, log, authTypes)
 
-	router := service.NewRouter(db, log, env)
+	// Setup Router
+	router := service.NewRouter(db, log, authTypes, env.MarathonWebsiteURL)
 
+	// Prepare the server
 	srv := &http.Server{
 		Addr:         ":" + env.Server.Port,
 		Handler:      router,
