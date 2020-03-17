@@ -119,7 +119,7 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Rout
 			"GET",
 			"/login",
 			false,
-			true,
+			false,
 			api.Login,
 		},
 
