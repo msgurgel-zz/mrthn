@@ -16,17 +16,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// We need to have a client that can be used to independently make calls to different apis
+// We need to have a client that can be used to independently make calls to different APIs
 
-type Oauth2 struct {
+type OAuth2 struct {
 	RequestClient *http.Client              // The client that methods can use to make the requests
 	Configs       map[string]*oauth2.Config // Map of strings to OAuth Configs
 	CurrentStates map[string]StateKeys
 }
 
 type OAuth2Result struct {
-	AccessToken  string
-	RefreshToken string
+	Token        *oauth2.Token
 	ClientID     int
 	PlatformName string
 	Callback     string
@@ -44,48 +43,19 @@ type StateKeys struct {
 	ClientID int
 }
 
-func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
-	OauthConfigs := make(map[string]*oauth2.Config)
-
-	// Initialize all platforms OAuth2 configs
-	OauthConfigs["fitbit"] = &oauth2.Config{
-		RedirectURL:  configs.Callback,
-		ClientID:     configs.Fitbit.ClientID,
-		ClientSecret: configs.Fitbit.ClientSecret,
-		Scopes:       []string{"activity", "profile", "settings", "heartrate"},
-		Endpoint:     endpoints.Fitbit,
-	}
-
-	return OauthConfigs
-}
-
-func createStateString(service string) string {
-	serviceBytes := []byte(service)
-
-	data := make([]byte, 30) // 30 characters should be a good random string
-	if _, err := io.ReadFull(rand.Reader, data); err != nil {
-		return "" // TODO: return an error here, log it and return an error for the end user
-	}
-
-	// add the service type to the front and the userID in the back
-	stateString := append(serviceBytes, data...)
-
-	return base64.StdEncoding.EncodeToString(stateString)
-}
-
-func NewOAuth2(configs *environment.MarathonConfig) Oauth2 {
+func NewOAuth2(configs *environment.MarathonConfig) OAuth2 {
 	requestClient := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 10 * time.Second, // TODO: Make this an environment variable
 	}
 
-	return Oauth2{
+	return OAuth2{
 		RequestClient: requestClient,
 		Configs:       initializeOAuth2Map(configs),
 		CurrentStates: make(map[string]StateKeys),
 	}
 }
 
-func (o *Oauth2) retrieveStateObject(stateKey string) (StateKeys, error) {
+func (o *OAuth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 	// Check if the StateKeys structure actually exists
 	if State, ok := o.CurrentStates[stateKey]; ok {
 		// Return the state key while removing it from the list
@@ -97,7 +67,7 @@ func (o *Oauth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 }
 
 // ObtainUserTokens checks if the inputted state exists. If so, it attempts to exchange the passed in code for the access and refresh tokens
-func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, error) {
+func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, error) {
 
 	// first things first, does this state actually exist?
 	ReturnedState, err := o.retrieveStateObject(stateKey)
@@ -116,8 +86,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 
 				// return the tokens! If we need more values, such as the expiry date, we can return more here
 				return OAuth2Result{
-					AccessToken:  token.AccessToken,
-					RefreshToken: token.RefreshToken,
+					Token:        token,
 					ClientID:     ReturnedState.ClientID,
 					PlatformName: ReturnedState.Platform,
 					Callback:     ReturnedState.Callback,
@@ -135,7 +104,7 @@ func (o *Oauth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, e
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) {
+func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) {
 	ReturnedKeys := StateKeys{}
 
 	// check if the service actually exists
@@ -157,4 +126,44 @@ func (o *Oauth2) CreateStateObject(callbackURL string, service string, clientID 
 	}
 
 	return ReturnedKeys, nil
+}
+
+func RefreshOAuth2Tokens(tokens *oauth2.Token, conf *oauth2.Config) (*oauth2.Token, error) {
+	// Attempt to refresh token
+	tokenSource := conf.TokenSource(context.Background(), tokens)
+	newTokens, err := tokenSource.Token()
+	if err != nil {
+		return nil, errors.New("failed to refresh token: " + err.Error())
+	}
+
+	return newTokens, nil
+}
+
+func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
+	OAuthConfigs := make(map[string]*oauth2.Config)
+
+	// Initialize all platforms OAuth2 configs
+	OAuthConfigs["fitbit"] = &oauth2.Config{
+		RedirectURL:  configs.Callback,
+		ClientID:     configs.Fitbit.ClientID,
+		ClientSecret: configs.Fitbit.ClientSecret,
+		Scopes:       []string{"activity", "profile", "settings", "heartrate"},
+		Endpoint:     endpoints.Fitbit,
+	}
+
+	return OAuthConfigs
+}
+
+func createStateString(service string) string {
+	serviceBytes := []byte(service)
+
+	data := make([]byte, 30) // 30 characters should be a good random string
+	if _, err := io.ReadFull(rand.Reader, data); err != nil {
+		return "" // TODO: return an error here, log it and return an error for the end user
+	}
+
+	// add the service type to the front and the userID in the back
+	stateString := append(serviceBytes, data...)
+
+	return base64.StdEncoding.EncodeToString(stateString)
 }

@@ -16,7 +16,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -24,7 +23,6 @@ import (
 
 	"github.com/msgurgel/marathon/pkg/auth"
 	"github.com/msgurgel/marathon/pkg/dal"
-	"github.com/msgurgel/marathon/pkg/environment"
 	"github.com/msgurgel/marathon/pkg/helpers"
 	"github.com/msgurgel/marathon/pkg/model"
 )
@@ -35,14 +33,12 @@ type Api struct {
 	db          *sql.DB
 }
 
-func NewApi(db *sql.DB, logger *logrus.Logger, config *environment.MarathonConfig) Api {
-	api := Api{
-		log: logger,
-		db:  db,
+func NewApi(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Api {
+	return Api{
+		log:         logger,
+		db:          db,
+		authMethods: authTypes,
 	}
-	api.authMethods.GetAuthTypes(config)
-
-	return api
 }
 
 func (api *Api) Index(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +231,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 			"func":  "Callback",
 			"err":   err,
 			"state": r.FormValue("state"),
-		}).Error("failed to retrieve Oauth2 token for user")
+		}).Error("failed to retrieve OAuth2 token for user")
 		api.sendAuthorizationResult(w, r, 0, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
 
 		return
@@ -457,7 +453,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	newCallback := r.Form.Get("callback")
 	if newCallback == "" {
 		response := CallbackUpdateResponse{
@@ -473,7 +469,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	vars := mux.Vars(r)
 	if vars["clientID"] == "" {
 		response := CallbackUpdateResponse{
@@ -487,7 +483,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 			"err":  "clientID not received",
 		}).Error("failed to parse client 'clientID' parameter")
 	}
-	
+
 	clientID, err := strconv.Atoi(vars["clientID"])
 	if err != nil {
 		response := CallbackUpdateResponse{
@@ -504,7 +500,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	
+
 	// We have the new callback so now update the client with it
 	result, err := dal.UpdateCallback(api.db, clientID, newCallback)
 	if err != nil {
@@ -518,7 +514,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 			"func": "UpdateClientCallback",
 			"err":  err,
 		}).Error("failed to update client callback")
-		
+
 		return
 	}
 
@@ -531,7 +527,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 		api.respondWithJSON(w, http.StatusBadRequest, response)
 		return
 	}
-	
+
 	response := CallbackUpdateResponse{
 		Success:         true,
 		UpdatedCallback: newCallback,
@@ -613,8 +609,14 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		}
 
 		// Create the credentials for the user
-		var connectionParams = []string{"oauth2", Oauth2Params.AccessToken, Oauth2Params.RefreshToken}
-		connStr, err := formatConnectionString(connectionParams)
+		var connectionParams = []string{
+			"oauth2",
+			Oauth2Params.Token.TokenType,
+			Oauth2Params.Token.Expiry.Format(helpers.ISO8601Layout),
+			Oauth2Params.Token.AccessToken,
+			Oauth2Params.Token.RefreshToken,
+		}
+		connStr, err := helpers.FormatConnectionString(connectionParams)
 		if err != nil {
 			return 0, err
 		}
@@ -643,19 +645,6 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 	default:
 		return 0, errors.New(Oauth2Params.PlatformName + " service does not exist")
 	}
-}
-
-func formatConnectionString(connectionParams []string) (string, error) {
-	if len(connectionParams) == 0 {
-		return "", errors.New("must contain non zero amount of Connection parameters")
-	}
-
-	var sb strings.Builder
-	for _, param := range connectionParams {
-		sb.WriteString(param + ";")
-	}
-
-	return sb.String(), nil
 }
 
 func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {

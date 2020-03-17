@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/msgurgel/marathon/pkg/helpers"
+
+	"golang.org/x/oauth2"
 
 	"errors"
 
@@ -190,19 +195,31 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 }
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
-func GetUserTokens(db *sql.DB, fromUserID int, platform string) (string, string, error) {
+func GetUserTokens(db *sql.DB, fromUserID int, platform string) (*oauth2.Token, error) {
 	// Get the credentials from the database
 	connectionParams, err := GetUserConnection(db, fromUserID, platform)
 	if err != nil {
-		return "", "", err
+		return &oauth2.Token{}, err
 	}
 
 	// Since we know we are going for tokens, parse them out of the connection struct
 	if connectionParams.ConnectionType != "oauth2" {
-		return "", "", errors.New("expected Oauth2 authentication type, was instead " + connectionParams.ConnectionType)
+		return &oauth2.Token{}, errors.New("expected Oauth2 authentication type, was instead " + connectionParams.ConnectionType)
 	}
 
-	return connectionParams.Parameters["access_token"], connectionParams.Parameters["refresh_token"], nil
+	expiry, err := time.Parse(helpers.ISO8601Layout, connectionParams.Parameters["expiry"])
+	if err != nil {
+		return &oauth2.Token{}, errors.New(
+			"failed to convert expiry to time.time – value was " + connectionParams.Parameters["expiry"],
+		)
+	}
+
+	return &oauth2.Token{
+		AccessToken:  connectionParams.Parameters["access_token"],
+		RefreshToken: connectionParams.Parameters["refresh_token"],
+		TokenType:    connectionParams.Parameters["token_type"],
+		Expiry:       expiry,
+	}, nil
 }
 
 func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection, error) {
@@ -229,7 +246,6 @@ func GetUserConnection(db *sql.DB, userID int, platformName string) (Connection,
 
 	// Format the user connection values
 	userConnection, err := parseConnectionString(credentials)
-
 	if err != nil {
 		return Connection{}, err
 	}
@@ -342,20 +358,53 @@ func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) 
 }
 
 func UpdateCallback(db *sql.DB, clientID int, newCallback string) (bool, error) {
-	clientIDcheck, err := checkClientExistence(db, clientID)
+	clientIDCheck, err := checkClientExistence(db, clientID)
 	if err != nil {
 		return false, err
 	}
-	if clientIDcheck {
+
+	if clientIDCheck {
 		// Update the client callback
 		updateString := fmt.Sprintf("UPDATE client SET callback = '%s' WHERE id = %d", newCallback, clientID)
 		_, err := db.Exec(updateString)
 		if err != nil {
 			return false, err
 		}
+
 		return true, nil
 	}
+
 	return false, nil
+}
+
+func UpdateCredentials(db *sql.DB, userID int, credentialsString string) error {
+	updateString := fmt.Sprintf("UPDATE credentials SET connection_string = '%s' WHERE user_id = %d", credentialsString, userID)
+	_, err := db.Exec(updateString)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UpdateCredentialsUsingOAuth2Tokens(db *sql.DB, userID int, tokens *oauth2.Token) error {
+	connStr, err := helpers.FormatConnectionString([]string{
+		"oauth2",
+		tokens.TokenType,
+		tokens.Expiry.Format(helpers.ISO8601Layout),
+		tokens.AccessToken,
+		tokens.RefreshToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = UpdateCredentials(db, userID, connStr)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func checkClientExistence(db *sql.DB, clientID int) (bool, error) {
@@ -383,10 +432,12 @@ func parseConnectionString(connectionString string) (Connection, error) {
 	// Check what type of Connection string this is
 	switch connectionParams[0] {
 	case "oauth2":
-		// This is an oauth2 Connection, so we will need an access and refresh token
+		// This is an OAuth2 Connection, so we will need an access and refresh token
 		params := make(map[string]string)
-		params["access_token"] = connectionParams[1]
-		params["refresh_token"] = connectionParams[2]
+		params["token_type"] = connectionParams[1]
+		params["expiry"] = connectionParams[2]
+		params["access_token"] = connectionParams[3]
+		params["refresh_token"] = connectionParams[4]
 
 		returnedConnection.ConnectionType = "oauth2"
 		returnedConnection.Parameters = params
