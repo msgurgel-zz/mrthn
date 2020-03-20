@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/context"
+
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
@@ -106,6 +108,10 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
 	}
 
+	if !api.clientCanQueryUser(w, r, userID) {
+		return
+	}
+
 	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
@@ -126,6 +132,10 @@ func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
 	}
 
+	if !api.clientCanQueryUser(w, r, userID) {
+		return
+	}
+
 	distanceValues, err := model.GetUserDistance(api.db, api.log, userID, date)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
@@ -144,6 +154,10 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !api.clientCanQueryUser(w, r, userID) {
 		return
 	}
 
@@ -179,9 +193,9 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !parseToken.valid {
 		api.log.WithFields(logrus.Fields{
 			"err": err,
-		}).Error("JWT was invalid")
+		}).Error("JWT was missing or invalid")
 
-		api.respondWithError(w, http.StatusUnauthorized, "Invalid JWT token")
+		api.respondWithError(w, http.StatusUnauthorized, "Access token is missing or invalid")
 		return
 	}
 
@@ -211,7 +225,6 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Create the state object TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
 	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], parseToken.clientID)
-
 	if ok == nil {
 		url := RequestStateObject.URL                          // check what type of request was made using the StateObject
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
@@ -572,6 +585,41 @@ func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID 
 	}
 
 	return userID, date, err
+}
+
+func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userID int) bool {
+	clientID := context.Get(r, "client_id") // This was set during JWT validation middleware
+	if clientID == nil {
+		api.log.Error("failed to get client ID from JWT token")
+		api.respondWithError(w, http.StatusInternalServerError, "Something went wrong... Try again later")
+
+		return false
+	}
+
+	dbUser, err := dal.GetUserInUserbase(api.db, userID, clientID.(int))
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to get user from the database")
+
+		api.respondWithError(w, http.StatusInternalServerError, "Something went wrong... Try again later")
+
+		return false
+	}
+
+	if dbUser != userID {
+		// Client does not have permission to access this user!
+		api.log.WithFields(logrus.Fields{
+			"userID":   userID,
+			"clientID": clientID.(int),
+		}).Warn("client tried to access unauthorized or non-existent user")
+
+		api.respondWithError(w, http.StatusNotFound, "User with specified ID was not found")
+
+		return false
+	}
+
+	return true
 }
 
 func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {

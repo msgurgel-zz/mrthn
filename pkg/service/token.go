@@ -43,9 +43,8 @@ func validateJWT(db *sql.DB, tokenString string) (parseToken, error) {
 			return nil, errors.New("unable to parse JWT claims")
 		}
 	})
-
 	if err != nil {
-		return parseToken{valid: false}, err
+		return parseToken{}, err
 	}
 
 	if token.Valid {
@@ -66,8 +65,13 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 		var token string
 
 		// Get token from the Authorization header
-
 		tokens, ok := r.Header["Authorization"]
+		if !ok {
+			log.Error("Authorization header was empty")
+			SendErrorToClient(w, log)
+
+			return
+		}
 
 		if ok && len(tokens) >= 1 {
 			token = tokens[0]
@@ -75,6 +79,13 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 		}
 
 		parseToken, err := validateJWT(db, token)
+		if err != nil {
+			log.Error("failed to parse JWT")
+			SendErrorToClient(w, log)
+
+			return
+		}
+
 		if parseToken.valid {
 			context.Set(r, "client_id", parseToken.clientID)
 			next.ServeHTTP(w, r)
@@ -83,19 +94,23 @@ func jwtMiddleware(db *sql.DB, log *logrus.Logger, next http.Handler) http.Handl
 				"err": err,
 			}).Error("JWT was invalid")
 
-			// just copy/paste the code for this part
-
-			payload := map[string]string{"error": err.Error()}
-
-			response, _ := json.Marshal(payload)
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_, err := w.Write(response) // TODO: deal with possible error
-
-			if err != nil {
-
-			}
+			SendErrorToClient(w, log)
 		}
 	})
+}
+
+func SendErrorToClient(w http.ResponseWriter, log *logrus.Logger) {
+	payload := map[string]string{"error": "Access token is missing or invalid"}
+
+	response, _ := json.Marshal(payload)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+
+	_, err := w.Write(response)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to send response to client")
+	}
 }
