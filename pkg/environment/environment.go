@@ -83,8 +83,13 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 		return nil, errors.New("failed to convert IDLE_TIMEOUT to int")
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		return nil, errors.New("environment variable PORT is not set")
+	}
+
 	srv := serverConfig{
-		Port:         os.Getenv("PORT"),
+		Port:         port,
 		ReadTimeOut:  time.Second * time.Duration(readTime),
 		WriteTimeOut: time.Second * time.Duration(writeTime),
 		IdleTimeout:  time.Second * time.Duration(idleTime),
