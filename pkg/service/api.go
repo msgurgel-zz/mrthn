@@ -234,7 +234,7 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 	// TODO: Remove dependency on OAuth2
 	// Check that the state returned was valid
-	Oauth2Result, err := api.authMethods.Oauth2.ObtainUserTokens(
+	Oauth2Result, callback, err := api.authMethods.Oauth2.ObtainUserTokens(
 		r.FormValue("state"),
 		r.FormValue("code"),
 	)
@@ -245,7 +245,10 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 			"err":   err,
 			"state": r.FormValue("state"),
 		}).Error("failed to retrieve OAuth2 token for user")
-		api.sendAuthorizationResult(w, r, 0, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
+
+		if callback != "" {
+			api.sendAuthorizationResult(w, r, 0, callback)
+		}
 
 		return
 	}
@@ -258,7 +261,7 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 		}).Error("failed to create a new user in the database")
 	}
 
-	api.sendAuthorizationResult(w, r, userID, Oauth2Result.Callback)
+	api.sendAuthorizationResult(w, r, userID, callback)
 }
 
 func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {

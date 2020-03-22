@@ -29,7 +29,6 @@ type OAuth2Result struct {
 	Token        *oauth2.Token
 	ClientID     int
 	PlatformName string
-	Callback     string
 	PlatformID   string
 }
 
@@ -77,96 +76,86 @@ func (o *OAuth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 }
 
 // ObtainUserTokens checks if the inputted state exists. If so, it attempts to exchange the passed in code for the access and refresh tokens
-func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, error) {
+func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Result, callback string, err error) {
+	// First things first, does this state actually exist?
+	returnedState, err := o.retrieveStateObject(stateKey)
+	if err != nil {
+		// This was an unexpected state
+		return OAuth2Result{}, "", err
+	}
 
-	// first things first, does this state actually exist?
-	ReturnedState, err := o.retrieveStateObject(stateKey)
+	// This was an expected request.
+	// Depending on what service was called, exchanging the code for the tokens may work slightly differently
+	switch returnedState.Platform {
+	case "fitbit":
+		// exchange the code received for an access and refresh token
+		token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
 
-	if err == nil {
-		// This was an expected request.
-		// Depending on what service was called, exchanging the code for the tokens may work slightly differently
-		switch ReturnedState.Platform {
-		case "fitbit":
-			// exchange the code received for an access and refresh token
-			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
-
-			if err != nil {
-				return OAuth2Result{Callback: ReturnedState.Callback}, err
-			} else {
-
-				// Return the tokens! If we need more values, such as the expiry date, we can return more here
-				return OAuth2Result{
-					Token:        token,
-					ClientID:     ReturnedState.ClientID,
-					PlatformName: ReturnedState.Platform,
-					Callback:     ReturnedState.Callback,
-					PlatformID:   token.Extra("user_id").(string),
-				}, err
-
-			}
-		case "google":
-			// Exchange the code received for an access and refresh token
-			tokens, err := o.Configs["google"].Exchange(context.Background(), code)
-			if err != nil {
-				return OAuth2Result{Callback: ReturnedState.Callback}, err
-			}
-
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		} else {
 			// Return the tokens! If we need more values, such as the expiry date, we can return more here
-			googleOauth2Result := OAuth2Result{
-				Token:        tokens,
-				ClientID:     ReturnedState.ClientID,
-				PlatformName: ReturnedState.Platform,
-				Callback:     ReturnedState.Callback,
+			result = OAuth2Result{
+				Token:        token,
+				ClientID:     returnedState.ClientID,
+				PlatformName: returnedState.Platform,
+				PlatformID:   token.Extra("user_id").(string),
 			}
 
-			// Before we can return the result, we need to find out the users email address
-			req, err := http.NewRequest("GET", "https://www.googleapis.com/gmail/v1/users/me/profile", nil)
-			req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
-
-			client := o.Configs["google"].Client(context.Background(), tokens)
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			// Unmarshal the JSON response into a google user profile response
-			userProfile := UserProfileResponse{}
-			err = json.Unmarshal(body, &userProfile)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			// Put the users email into the oauth2 result
-			googleOauth2Result.PlatformID = userProfile.EmailAddress
-
-			return googleOauth2Result, err
-
-		default:
-			return OAuth2Result{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Platform + " service does not exist")
+			return result, returnedState.Callback, nil
 		}
-	} else {
-		// this was an unexpected state
-		return OAuth2Result{Callback: ReturnedState.Callback}, err
+	case "google":
+		// Exchange the code received for an access and refresh token
+		tokens, err := o.Configs["google"].Exchange(context.Background(), code)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Prepare results
+		googleOauth2Result := OAuth2Result{
+			Token:        tokens,
+			ClientID:     returnedState.ClientID,
+			PlatformName: returnedState.Platform,
+		}
+
+		// Before we can return the result, we need to find out the users email address
+		client := o.Configs["google"].Client(context.Background(), tokens)
+		resp, err := client.Get("https://www.googleapis.com/gmail/v1/users/me/profile")
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Unmarshal the JSON response into a google user profile response
+		userProfile := UserProfileResponse{}
+		err = json.Unmarshal(body, &userProfile)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Put the users email into the oauth2 result
+		googleOauth2Result.PlatformID = userProfile.EmailAddress
+
+		return googleOauth2Result, returnedState.Callback, nil
+
+	default:
+		return OAuth2Result{}, returnedState.Callback, errors.New(returnedState.Platform + " service does not exist")
 	}
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) {
+func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) { // TODO: make the params a Params object
 	ReturnedKeys := StateKeys{}
 
-	// check if the service actually exists
-
-	// get the type of service that the user wishes to login with
+	// Get the type of service that the user wishes to login with
 	if serviceConfig, ok := o.Configs[service]; ok {
 		ReturnedKeys.Platform = service
 
-		// the user ID and service is valid, create a state string for it
+		// The service is valid, create a state string for it
 		stateString := createStateString(service)
 
 		ReturnedKeys.State = []byte(stateString)
