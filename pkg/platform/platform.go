@@ -54,3 +54,13 @@ func GetPlatforms(platformNames []string) []Platform {
 
 	return results
 }
+
+func IsPlatformAvailable(platform string) bool {
+	for availablePlatform := range Platforms {
+		if platform == availablePlatform {
+			return true
+		}
+	}
+
+	return false
+}

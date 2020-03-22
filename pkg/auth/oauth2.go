@@ -28,6 +28,7 @@ type OAuth2 struct {
 type OAuth2Result struct {
 	Token        *oauth2.Token
 	ClientID     int
+	UserID       int
 	PlatformName string
 	PlatformID   string
 }
@@ -41,6 +42,14 @@ type StateKeys struct {
 	URL      string
 	Callback string
 	ClientID int
+}
+
+// CreateStateObjectParams encapsulates all the params needed to call the CreateStateObject func
+type CreateStateObjectParams struct {
+	CallbackURL string
+	Service     string
+	ClientID    int
+	UserID      int // Optional parameter
 }
 
 // UserProfileResponse is a json structure representing the response of calling the users google profile
@@ -98,6 +107,7 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Re
 			result = OAuth2Result{
 				Token:        token,
 				ClientID:     returnedState.ClientID,
+				UserID:       returnedState.UserID,
 				PlatformName: returnedState.Platform,
 				PlatformID:   token.Extra("user_id").(string),
 			}
@@ -115,6 +125,7 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Re
 		googleOauth2Result := OAuth2Result{
 			Token:        tokens,
 			ClientID:     returnedState.ClientID,
+			UserID:       returnedState.UserID,
 			PlatformName: returnedState.Platform,
 		}
 
@@ -148,32 +159,33 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Re
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) { // TODO: make the params a Params object
-	ReturnedKeys := StateKeys{}
+func (o *OAuth2) CreateStateObject(p CreateStateObjectParams) (StateKeys, error) {
+	returnedKeys := StateKeys{}
 
 	// Get the type of service that the user wishes to login with
-	if serviceConfig, ok := o.Configs[service]; ok {
-		ReturnedKeys.Platform = service
+	if serviceConfig, ok := o.Configs[p.Service]; ok {
+		returnedKeys.Platform = p.Service
 
 		// The service is valid, create a state string for it
-		stateString := createStateString(service)
+		stateString := createStateString(p.Service)
 
-		ReturnedKeys.State = []byte(stateString)
+		returnedKeys.State = []byte(stateString)
 
-		if service == "google" {
-			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString, oauth2.AccessTypeOffline)
+		if p.Service == "google" {
+			returnedKeys.URL = serviceConfig.AuthCodeURL(stateString, oauth2.AccessTypeOffline)
 		} else {
-			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
+			returnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
 		}
 
-		ReturnedKeys.Callback = callbackURL
-		ReturnedKeys.ClientID = clientID
+		returnedKeys.Callback = p.CallbackURL
+		returnedKeys.ClientID = p.ClientID
+		returnedKeys.UserID = p.UserID
 
 		// Add this state to the state map
-		o.CurrentStates[string(ReturnedKeys.State)] = ReturnedKeys
+		o.CurrentStates[string(returnedKeys.State)] = returnedKeys
 	}
 
-	return ReturnedKeys, nil
+	return returnedKeys, nil
 }
 
 func RefreshOAuth2Tokens(tokens *oauth2.Token, conf *oauth2.Config) (*oauth2.Token, error) {
