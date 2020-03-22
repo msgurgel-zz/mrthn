@@ -34,4 +34,6 @@ CREATE INDEX credentials_upid_index ON credentials(upid);
 -- Insert initial setup values
 INSERT INTO client (name, password, callback)
 VALUES ('Passive Marathon', 'bad_hash', 'test_callback');
+
+INSERT INTO platform (name, domain) VALUES ('google', 'https://www.googleapis.com/fitness/v1');
 INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1');

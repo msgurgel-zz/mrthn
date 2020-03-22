@@ -27,6 +27,69 @@ class SandwichTest < Minitest::Test
         assert_equal 2020, parsed["steps"][0]["value"]
     end
 
+    def test_get_steps_google
+        response = HTTParty.get('http://localhost:8080/user/2/steps?date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                 "Authorization" => "Bearer #{@jwt}",
+                }
+            })
+
+            parsed = JSON.parse(response.body)
+            assert_equal 2, parsed["id"]
+            assert_equal 'google', parsed["steps"][0]["platform"]
+            assert_equal 500, parsed["steps"][0]["value"]
+    end
+
+    def test_get_calories_google
+        response = HTTParty.get('http://localhost:8080/user/2/calories?date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                 "Authorization" => "Bearer #{@jwt}",
+                   }
+            })
+
+            parsed = JSON.parse(response.body)
+            assert_equal 2, parsed["id"]
+            assert_equal 'google', parsed["calories"][0]["platform"]
+            assert_equal 1635, parsed["calories"][0]["value"]
+    end
+
+    def test_get_distance_google
+        response = HTTParty.get('http://localhost:8080/user/2/distance?date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+                }
+            })
+
+            parsed = JSON.parse(response.body)
+            assert_equal 2, parsed["id"]
+            assert_equal 'google', parsed["distance"][0]["platform"]
+            assert_equal 3.456, parsed["distance"][0]["value"]
+    end
+
+    def test_get_calories_all_platforms
+            response = HTTParty.get('http://localhost:8080/user/3/calories?date=2020-02-13', {
+                headers: {
+                    "User-Agent" => "Sandwich",
+                    "Authorization" => "Bearer #{@jwt}",
+                    }
+                })
+
+                parsed = JSON.parse(response.body)
+                assert_equal 3, parsed["id"]
+
+                #it appears fitbit will come before google in the return object
+                assert_equal 'fitbit', parsed["calories"][0]["platform"]
+                assert_equal 1010, parsed["calories"][0]["value"]
+
+                assert_equal 'google', parsed["calories"][1]["platform"]
+                assert_equal 1635, parsed["calories"][1]["value"]
+
+
+    end
+
     def test_client_signup_name_already_taken
         response = HTTParty.post(
             'http://localhost:8080/signup',
@@ -161,5 +224,6 @@ class SandwichTest < Minitest::Test
 
                     assert_equal true, parsed["success"]
                     assert_equal 'Sandwich_callback', parsed["updatedCallback"]
-        end
+    end
+
 end

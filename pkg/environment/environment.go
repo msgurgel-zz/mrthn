@@ -14,6 +14,7 @@ type MarathonConfig struct {
 	Server             serverConfig
 	DBConnectionString string
 	Fitbit             platformConfig
+	Google             platformConfig
 	Callback           string        // This will be the callback for all services. If we need multiple, this may need to change
 	ClientTimeout      time.Duration // The timeout for the client that is used to make requests for Marathon
 	MarathonWebsiteURL string        // We will only accept client SignUp requests if it comes from the Marathon website
@@ -109,6 +110,13 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	}
 
 	setConfig.Fitbit = FitbitConfig
+
+	GoogleConfig, err := addPlatformConfig("GOOGLE")
+	if err != nil {
+		return nil, err
+	}
+
+	setConfig.Google = GoogleConfig
 
 	return &setConfig, nil
 }

@@ -162,6 +162,11 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", params.PlatformName)
 	err = db.QueryRow(platIDQuery).Scan(&platformID)
 	if err != nil {
+
+		if err == sql.ErrNoRows {
+			return 0, errors.New(fmt.Sprintf("Platform name '%s' does not exist", params.PlatformName))
+		}
+
 		return 0, err
 	}
 
