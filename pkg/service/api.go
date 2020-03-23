@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/gorilla/context"
-
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/msgurgel/marathon/pkg/dal"
 	"github.com/msgurgel/marathon/pkg/helpers"
 	"github.com/msgurgel/marathon/pkg/model"
+	"github.com/msgurgel/marathon/pkg/platform"
 )
 
 type Api struct {
@@ -188,7 +188,7 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If the token exists, verify it exists in the database
+	// Token exists; validate it
 	parseToken, err := validateJWT(api.db, token[0])
 	if err != nil || !parseToken.valid {
 		api.log.WithFields(logrus.Fields{
@@ -199,42 +199,145 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	service, serviceOk := r.URL.Query()["service"]
-	callBackURL, callbackOk := r.URL.Query()["callback"]
+	// Start populating params struct
+	params := auth.CreateStateObjectParams{ClientID: parseToken.clientID}
 
+	// Get the other URL params
+	service, serviceOk := r.URL.Query()["service"]
+	callbackURL, callbackOk := r.URL.Query()["callback"]
+	userIDStrings, userIDOk := r.URL.Query()["userID"] // Optional param. Used when adding a new platform account to existing user
+
+	// Validate service param in URL
 	if !serviceOk || len(service) != 1 {
 		api.log.WithFields(logrus.Fields{
-			"func": "Login",
+			"func":     "Login",
+			"clientID": parseToken.clientID,
 		}).Error("missing URL param 'service'")
 
 		api.respondWithError(w, http.StatusBadRequest,
 			"expected single 'service' parameter with name of service to authenticate with",
 		)
+
+		return
+	}
+	if !platform.IsPlatformAvailable(service[0]) {
+		// Invalid platform was passed
+		api.log.WithFields(logrus.Fields{
+			"func":     "Login",
+			"clientID": parseToken.clientID,
+			"service":  service,
+		}).Error("invalid service was given")
+
+		api.respondWithError(w, http.StatusBadRequest, "invalid service. accepted are 'google' and 'fitbit'")
+
 		return
 	}
 
-	if !callbackOk || len(callBackURL) != 1 {
+	// Validate callback param in URL
+	if !callbackOk || len(callbackURL) != 1 {
 		api.log.WithFields(logrus.Fields{
-			"func": "Login",
+			"func":     "Login",
+			"clientID": parseToken.clientID,
 		}).Error("missing URL param 'callback'")
 
 		api.respondWithError(w, http.StatusBadRequest,
 			"expected single 'callback' parameter to contain valid callback url")
+
 		return
 	}
 
-	// Create the state object TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
-	RequestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(callBackURL[0], service[0], parseToken.clientID)
+	// Add validated service and callback to the params struct
+	params.Service = service[0]
+	params.CallbackURL = callbackURL[0]
+
+	// Check if the optional parameter userID was given
+	if userIDOk {
+		// Check if there's only one
+		if len(userIDStrings) != 1 {
+			api.log.WithFields(logrus.Fields{
+				"func":     "Login",
+				"clientID": parseToken.clientID,
+				"userID":   userIDStrings,
+			}).Error("more than one userID param was given")
+
+			api.respondWithError(w, http.StatusBadRequest,
+				"more than one optional parameter 'userID' was passed")
+
+			return
+		}
+
+		// Check if is a number
+		userID, err := strconv.Atoi(userIDStrings[0])
+		if err != nil {
+			api.log.WithFields(logrus.Fields{
+				"func":     "Login",
+				"clientID": parseToken.clientID,
+				"userID":   userIDStrings,
+			}).Error("userID was not a number")
+
+			api.respondWithError(w, http.StatusBadRequest,
+				"optional parameter 'userID' was expected to be a number")
+
+			return
+		}
+
+		// Check if client has access to the specified user
+		hasAccess := api.clientHasAccessToUser(w, parseToken.clientID, userID)
+		if !hasAccess {
+			return
+		}
+
+		// Check if user already has linked account of the given platform
+		userPlatforms, err := dal.GetPlatformNames(api.db, userID)
+		if err != nil {
+			api.log.WithFields(logrus.Fields{
+				"func": "Login",
+				"user": userID,
+				"err":  err,
+			}).Error("failed to get platform of user from db")
+			api.respondWithError(w, http.StatusInternalServerError, "something went wrong, try again later.")
+
+			return
+		}
+
+		var found bool
+		for _, p := range userPlatforms {
+			if p == service[0] {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			// User already has an account linked from the given platform
+			api.log.WithFields(logrus.Fields{
+				"func":     "Login",
+				"platform": service[0],
+				"client":   parseToken.clientID,
+				"user":     userID,
+			}).Warn("client tried to link already linked platform account")
+
+			api.respondWithError(w, http.StatusBadRequest, "user has already linked account of service '"+service[0]+"'")
+
+			return
+		}
+
+		// Add the validated userID to the params struct
+		params.UserID = userID
+	}
+
+	// TODO: This is dependent on OAuth2. When new auth types are needed, this will have to be changed
+	requestStateObject, ok := api.authMethods.Oauth2.CreateStateObject(params)
 	if ok == nil {
-		url := RequestStateObject.URL                          // check what type of request was made using the StateObject
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect) // redirect with the stateObjects url
+		url := requestStateObject.URL                          // Check what type of request was made using the StateObject
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect) // Redirect with the stateObjects url
 	}
 }
 
 func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 	// TODO: Remove dependency on OAuth2
 	// Check that the state returned was valid
-	Oauth2Result, err := api.authMethods.Oauth2.ObtainUserTokens(
+	Oauth2Result, callback, err := api.authMethods.Oauth2.ObtainUserTokens(
 		r.FormValue("state"),
 		r.FormValue("code"),
 	)
@@ -245,20 +348,45 @@ func (api *Api) Callback(w http.ResponseWriter, r *http.Request) {
 			"err":   err,
 			"state": r.FormValue("state"),
 		}).Error("failed to retrieve OAuth2 token for user")
-		api.sendAuthorizationResult(w, r, 0, Oauth2Result.Callback) // TODO: This goes against Go's design principles. Need to be changed
+
+		if callback != "" {
+			api.sendAuthorizationResult(w, r, 0, callback)
+		}
 
 		return
 	}
 
-	userID, err := createUser(&Oauth2Result, api.db, api.log)
-	if err != nil {
-		api.log.WithFields(logrus.Fields{
-			"func": "Callback",
-			"err":  err,
-		}).Error("failed to create a new user in the database")
-	}
+	// Is this request for a new user or an existing user?
+	if Oauth2Result.UserID == 0 {
+		// New user
+		userID, err := api.createUser(&Oauth2Result)
+		if err != nil {
+			api.log.WithFields(logrus.Fields{
+				"func": "Callback",
+				"err":  err,
+			}).Error("failed to create a new user in the database")
+			api.sendFailedAuthorizationResult(w, r, callback)
 
-	api.sendAuthorizationResult(w, r, userID, Oauth2Result.Callback)
+			return
+		}
+
+		api.sendAuthorizationResult(w, r, userID, callback)
+	} else {
+		// Existing user
+		err = api.createUserCredentials(&Oauth2Result, Oauth2Result.UserID)
+		if err != nil {
+			api.log.WithFields(logrus.Fields{
+				"func":   "Callback",
+				"userID": Oauth2Result.UserID,
+				"err":    err,
+			}).Error("failed to add new credentials to existing user")
+			api.sendFailedAuthorizationResult(w, r, callback)
+
+			return
+		}
+
+		api.sendAuthorizationResult(w, r, Oauth2Result.UserID, callback)
+	}
 }
 
 func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +425,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the name already exists. This should probably be done already before SignUp is called
-	userId, err := dal.CheckClientName(api.db, clientName)
+	clientID, err := dal.GetClientID(api.db, clientName)
 	if err != nil {
 		response := ClientSignUpResponse{
 			Success: false,
@@ -313,7 +441,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userId != 0 {
+	if clientID != 0 {
 		response := ClientSignUpResponse{
 			Success: false,
 			Error:   "Client name already taken",
@@ -328,9 +456,9 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientPassWord := r.Form.Get("password")
+	clientPassword := r.Form.Get("password")
 
-	if clientPassWord == "" {
+	if clientPassword == "" {
 		response := ClientSignUpResponse{
 			Success: false,
 			Error:   "Expected parameter 'password' in request",
@@ -345,7 +473,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientID, err := dal.CreateNewClient(api.db, clientName, clientPassWord)
+	newClientID, err := dal.InsertNewClient(api.db, clientName, clientPassword)
 	if err != nil {
 		api.respondWithError(w, http.StatusInternalServerError, "Error occurred while attempting to create client")
 		api.log.WithFields(logrus.Fields{
@@ -359,7 +487,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	// Send a success message back
 	response := ClientSignUpResponse{
 		Success:    true,
-		ClientID:   clientID,
+		ClientID:   newClientID,
 		ClientName: clientName,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
@@ -559,7 +687,15 @@ func (api *Api) sendAuthorizationResult(w http.ResponseWriter, r *http.Request, 
 		"userId":   userId,
 	}).Info("sending login result to client")
 
-	http.Redirect(w, r, Callback, 307)
+	http.Redirect(w, r, Callback, http.StatusTemporaryRedirect)
+}
+
+func (api *Api) sendFailedAuthorizationResult(w http.ResponseWriter, r *http.Request, Callback string) {
+	api.log.WithFields(logrus.Fields{
+		"callback": Callback,
+	}).Info("sending failed login result to client")
+
+	http.Redirect(w, r, Callback, http.StatusInternalServerError)
 }
 
 func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID int, date time.Time, err error) {
@@ -587,16 +723,8 @@ func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID 
 	return userID, date, err
 }
 
-func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userID int) bool {
-	clientID := context.Get(r, "client_id") // This was set during JWT validation middleware
-	if clientID == nil {
-		api.log.Error("failed to get client ID from JWT token")
-		api.respondWithError(w, http.StatusInternalServerError, "Something went wrong... Try again later")
-
-		return false
-	}
-
-	dbUser, err := dal.GetUserInUserbase(api.db, userID, clientID.(int))
+func (api *Api) clientHasAccessToUser(w http.ResponseWriter, clientID, userID int) bool {
+	dbUser, err := dal.GetUserInUserbase(api.db, userID, clientID)
 	if err != nil {
 		api.log.WithFields(logrus.Fields{
 			"err": err,
@@ -611,7 +739,7 @@ func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userI
 		// Client does not have permission to access this user!
 		api.log.WithFields(logrus.Fields{
 			"userID":   userID,
-			"clientID": clientID.(int),
+			"clientID": clientID,
 		}).Warn("client tried to access unauthorized or non-existent user")
 
 		api.respondWithError(w, http.StatusNotFound, "User with specified ID was not found")
@@ -622,10 +750,21 @@ func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userI
 	return true
 }
 
-func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger) (int, error) {
+func (api *Api) clientCanQueryUser(w http.ResponseWriter, r *http.Request, userID int) bool {
+	clientID := context.Get(r, "client_id") // This was set during JWT validation middleware
+	if clientID == nil {
+		api.log.Error("failed to get client ID from JWT token")
+		api.respondWithError(w, http.StatusInternalServerError, "Something went wrong... Try again later")
 
-	// Before we create the user, check the id to see if its in the database
-	userID, err := dal.GetUserByPlatformID(db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
+		return false
+	}
+
+	return api.clientHasAccessToUser(w, clientID.(int), userID)
+}
+
+func (api *Api) createUser(Oauth2Params *auth.OAuth2Result) (int, error) {
+	// Before we create the user, check the ID to see if it's in the database
+	userID, err := dal.GetUserByPlatformID(api.db, Oauth2Params.PlatformID, Oauth2Params.PlatformName)
 	if err != nil {
 		return 0, err
 	}
@@ -634,14 +773,14 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		// This user already exists in the Marathon User table.
 		// However, the user may not exist in the clients userbase.
 		// Check if they do.
-		userID, err := dal.GetUserInUserbase(db, userID, Oauth2Params.ClientID)
+		userID, err := dal.GetUserInUserbase(api.db, userID, Oauth2Params.ClientID)
 		if err != nil {
 			return 0, err
 		}
 
 		if userID == 0 {
 			// The user exists, but is not in the clients userbase. Add it.
-			err := dal.AddUserToUserbase(db, userID, Oauth2Params.ClientID)
+			err := dal.InsertUserToUserbase(api.db, userID, Oauth2Params.ClientID)
 			if err != nil {
 				return 0, err
 			}
@@ -654,7 +793,24 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 		return userID, nil
 	}
 
+	// Create user
+	newUserID, err := dal.InsertNewUser(api.db)
+
 	// Create the credentials for the user
+	err = api.createUserCredentials(Oauth2Params, newUserID)
+	if err != nil {
+		return 0, err
+	}
+
+	api.log.WithFields(logrus.Fields{
+		"userID":   userID,
+		"platform": Oauth2Params.PlatformName,
+	}).Info("new user created")
+
+	return newUserID, nil
+}
+
+func (api *Api) createUserCredentials(Oauth2Params *auth.OAuth2Result, userID int) error {
 	var connectionParams = []string{
 		"oauth2",
 		Oauth2Params.Token.TokenType,
@@ -664,33 +820,26 @@ func createUser(Oauth2Params *auth.OAuth2Result, db *sql.DB, log *logrus.Logger)
 	}
 	connStr, err := helpers.FormatConnectionString(connectionParams)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	params := dal.CredentialParams{
+		UserID:           userID,
 		ClientID:         Oauth2Params.ClientID,
 		PlatformName:     Oauth2Params.PlatformName,
 		UPID:             Oauth2Params.PlatformID,
 		ConnectionString: connStr,
 	}
-	userID, err = dal.InsertUserCredentials(db, params)
-
+	userID, err = dal.InsertUserCredentials(api.db, params)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		api.log.WithFields(logrus.Fields{
 			"err":      err,
 			"platform": Oauth2Params.PlatformName,
 		}).Error("failed to create a new user")
 
-		return 0, err
+		return err
 	}
-
-	log.WithFields(logrus.Fields{
-		"userID":   userID,
-		"platform": Oauth2Params.PlatformName,
-	}).Info("new user created")
-
-	return userID, nil
-
+	return nil
 }
 
 func (api *Api) respondWithError(w http.ResponseWriter, code int, message string) {

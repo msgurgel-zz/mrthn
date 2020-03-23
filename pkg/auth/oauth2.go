@@ -28,8 +28,8 @@ type OAuth2 struct {
 type OAuth2Result struct {
 	Token        *oauth2.Token
 	ClientID     int
+	UserID       int
 	PlatformName string
-	Callback     string
 	PlatformID   string
 }
 
@@ -42,6 +42,14 @@ type StateKeys struct {
 	URL      string
 	Callback string
 	ClientID int
+}
+
+// CreateStateObjectParams encapsulates all the params needed to call the CreateStateObject func
+type CreateStateObjectParams struct {
+	CallbackURL string
+	Service     string
+	ClientID    int
+	UserID      int // Optional parameter
 }
 
 // UserProfileResponse is a json structure representing the response of calling the users google profile
@@ -77,114 +85,107 @@ func (o *OAuth2) retrieveStateObject(stateKey string) (StateKeys, error) {
 }
 
 // ObtainUserTokens checks if the inputted state exists. If so, it attempts to exchange the passed in code for the access and refresh tokens
-func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (OAuth2Result, error) {
+func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Result, callback string, err error) {
+	// First things first, does this state actually exist?
+	returnedState, err := o.retrieveStateObject(stateKey)
+	if err != nil {
+		// This was an unexpected state
+		return OAuth2Result{}, "", err
+	}
 
-	// first things first, does this state actually exist?
-	ReturnedState, err := o.retrieveStateObject(stateKey)
+	// This was an expected request.
+	// Depending on what service was called, exchanging the code for the tokens may work slightly differently
+	switch returnedState.Platform {
+	case "fitbit":
+		// exchange the code received for an access and refresh token
+		token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
 
-	if err == nil {
-		// This was an expected request.
-		// Depending on what service was called, exchanging the code for the tokens may work slightly differently
-		switch ReturnedState.Platform {
-		case "fitbit":
-			// exchange the code received for an access and refresh token
-			token, err := o.Configs["fitbit"].Exchange(context.Background(), code)
-
-			if err != nil {
-				return OAuth2Result{Callback: ReturnedState.Callback}, err
-			} else {
-
-				// Return the tokens! If we need more values, such as the expiry date, we can return more here
-				return OAuth2Result{
-					Token:        token,
-					ClientID:     ReturnedState.ClientID,
-					PlatformName: ReturnedState.Platform,
-					Callback:     ReturnedState.Callback,
-					PlatformID:   token.Extra("user_id").(string),
-				}, err
-
-			}
-		case "google":
-			// Exchange the code received for an access and refresh token
-			tokens, err := o.Configs["google"].Exchange(context.Background(), code)
-			if err != nil {
-				return OAuth2Result{Callback: ReturnedState.Callback}, err
-			}
-
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		} else {
 			// Return the tokens! If we need more values, such as the expiry date, we can return more here
-			googleOauth2Result := OAuth2Result{
-				Token:        tokens,
-				ClientID:     ReturnedState.ClientID,
-				PlatformName: ReturnedState.Platform,
-				Callback:     ReturnedState.Callback,
+			result = OAuth2Result{
+				Token:        token,
+				ClientID:     returnedState.ClientID,
+				UserID:       returnedState.UserID,
+				PlatformName: returnedState.Platform,
+				PlatformID:   token.Extra("user_id").(string),
 			}
 
-			// Before we can return the result, we need to find out the users email address
-			req, err := http.NewRequest("GET", "https://www.googleapis.com/gmail/v1/users/me/profile", nil)
-			req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
-
-			client := o.Configs["google"].Client(context.Background(), tokens)
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			// Unmarshal the JSON response into a google user profile response
-			userProfile := UserProfileResponse{}
-			err = json.Unmarshal(body, &userProfile)
-			if err != nil {
-				return googleOauth2Result, err
-			}
-
-			// Put the users email into the oauth2 result
-			googleOauth2Result.PlatformID = userProfile.EmailAddress
-
-			return googleOauth2Result, err
-
-		default:
-			return OAuth2Result{Callback: ReturnedState.Callback}, errors.New(ReturnedState.Platform + " service does not exist")
+			return result, returnedState.Callback, nil
 		}
-	} else {
-		// this was an unexpected state
-		return OAuth2Result{Callback: ReturnedState.Callback}, err
+	case "google":
+		// Exchange the code received for an access and refresh token
+		tokens, err := o.Configs["google"].Exchange(context.Background(), code)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Prepare results
+		googleOauth2Result := OAuth2Result{
+			Token:        tokens,
+			ClientID:     returnedState.ClientID,
+			UserID:       returnedState.UserID,
+			PlatformName: returnedState.Platform,
+		}
+
+		// Before we can return the result, we need to find out the users email address
+		client := o.Configs["google"].Client(context.Background(), tokens)
+		resp, err := client.Get("https://www.googleapis.com/gmail/v1/users/me/profile")
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Unmarshal the JSON response into a google user profile response
+		userProfile := UserProfileResponse{}
+		err = json.Unmarshal(body, &userProfile)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Put the users email into the oauth2 result
+		googleOauth2Result.PlatformID = userProfile.EmailAddress
+
+		return googleOauth2Result, returnedState.Callback, nil
+
+	default:
+		return OAuth2Result{}, returnedState.Callback, errors.New(returnedState.Platform + " service does not exist")
 	}
 }
 
 // CreateState creates a state string that we send along with the OAuth2 request
-func (o *OAuth2) CreateStateObject(callbackURL string, service string, clientID int) (StateKeys, error) {
-	ReturnedKeys := StateKeys{}
+func (o *OAuth2) CreateStateObject(p CreateStateObjectParams) (StateKeys, error) {
+	returnedKeys := StateKeys{}
 
-	// check if the service actually exists
+	// Get the type of service that the user wishes to login with
+	if serviceConfig, ok := o.Configs[p.Service]; ok {
+		returnedKeys.Platform = p.Service
 
-	// get the type of service that the user wishes to login with
-	if serviceConfig, ok := o.Configs[service]; ok {
-		ReturnedKeys.Platform = service
+		// The service is valid, create a state string for it
+		stateString := createStateString(p.Service)
 
-		// the user ID and service is valid, create a state string for it
-		stateString := createStateString(service)
+		returnedKeys.State = []byte(stateString)
 
-		ReturnedKeys.State = []byte(stateString)
-
-		if service == "google" {
-			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString, oauth2.AccessTypeOffline)
+		if p.Service == "google" {
+			returnedKeys.URL = serviceConfig.AuthCodeURL(stateString, oauth2.AccessTypeOffline)
 		} else {
-			ReturnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
+			returnedKeys.URL = serviceConfig.AuthCodeURL(stateString)
 		}
 
-		ReturnedKeys.Callback = callbackURL
-		ReturnedKeys.ClientID = clientID
+		returnedKeys.Callback = p.CallbackURL
+		returnedKeys.ClientID = p.ClientID
+		returnedKeys.UserID = p.UserID
 
 		// Add this state to the state map
-		o.CurrentStates[string(ReturnedKeys.State)] = ReturnedKeys
+		o.CurrentStates[string(returnedKeys.State)] = returnedKeys
 	}
 
-	return ReturnedKeys, nil
+	return returnedKeys, nil
 }
 
 func RefreshOAuth2Tokens(tokens *oauth2.Token, conf *oauth2.Config) (*oauth2.Token, error) {

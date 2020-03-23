@@ -198,9 +198,6 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 
 	// Mock expected DB calls in order
 	Mock.ExpectBegin()
-	Mock.ExpectQuery(
-		`^INSERT INTO "user" DEFAULT VALUES RETURNING id$`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 
 	expectedPlatIDSQL := fmt.Sprintf(`^SELECT id FROM platform WHERE name = '%s'$`, platName)
 	Mock.ExpectQuery(expectedPlatIDSQL).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(platID))
@@ -217,6 +214,7 @@ func TestInsertUserCredentials_ShouldInsertCredentials(t *testing.T) {
 
 	// Call the func that we are testing
 	actualUserID, err := InsertUserCredentials(DB, CredentialParams{
+		UserID:           userID,
 		ClientID:         clientID,
 		PlatformName:     platName,
 		UPID:             UPID,
@@ -324,7 +322,7 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 	Mock.ExpectQuery(`INSERT INTO client (.+) VALUES (.+)$`).WillReturnRows(rows)
 
 	// call the function we are testing
-	clientID, err := CreateNewClient(DB, clientName, clientPassword)
+	clientID, err := InsertNewClient(DB, clientName, clientPassword)
 	if err != nil {
 		t.Errorf("error was not expected when inserting a client: %s", err)
 	}
@@ -334,7 +332,7 @@ func TestSignUp_ShouldInsertNewClient(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 
-	assert.Equal(t, clientID, 1)
+	assert.Equal(t, 1, clientID)
 }
 
 func TestSignIn_ShouldSignInExistingClient(t *testing.T) {
@@ -379,7 +377,7 @@ func TestCheckClientName_ShouldReturnUserId(t *testing.T) {
 	Mock.ExpectQuery(fmt.Sprintf("^SELECT id FROM client WHERE name = '%s'$", clientName)).WillReturnRows(rows)
 
 	// call the function we are testing
-	returnedId, err := CheckClientName(DB, clientName)
+	returnedId, err := GetClientID(DB, clientName)
 	if err != nil {
 		t.Errorf("error was not expected when searching for a client: %s", err)
 	}
@@ -400,7 +398,7 @@ func TestAddUserToUserbase_ShouldNotReturnError(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	// call the function we are testing
-	err := AddUserToUserbase(DB, userID, clientID)
+	err := InsertUserToUserbase(DB, userID, clientID)
 	if err != nil {
 		t.Errorf("error was not expected when adding a userID to a client userbase: %s", err)
 	}
@@ -532,4 +530,23 @@ func TestUpdateCredentialsUsingOAuth2Tokens_ShouldUpdateCredentials(t *testing.T
 
 	// Assert that that update worked
 	assert.Nil(t, err)
+}
+
+func TestInsertNewUser_ShouldInsertUser(t *testing.T) {
+	Mock.ExpectQuery(
+		`^INSERT INTO "user" DEFAULT VALUES RETURNING id$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+	// Call the function we are testing
+	userID, err := InsertNewUser(DB)
+	if err != nil {
+		t.Errorf("error was not expected when inserting a client: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	assert.Equal(t, 1, userID)
 }

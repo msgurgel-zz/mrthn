@@ -23,6 +23,7 @@ type Connection struct {
 }
 
 type CredentialParams struct {
+	UserID           int
 	ClientID         int
 	PlatformName     string
 	UPID             string
@@ -59,6 +60,105 @@ func InsertSecretInExistingClient(db *sql.DB, clientID int, secret []byte) (int6
 
 	rows, _ := result.RowsAffected()
 	return rows, nil
+}
+
+func InsertUserToUserbase(db *sql.DB, userID int, clientID int) error {
+	queryString := fmt.Sprintf("INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, clientID)
+
+	_, err := db.Exec(queryString)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func InsertNewUser(db *sql.DB) (int, error) {
+	var userID int
+	err := db.QueryRow(`INSERT INTO "user" DEFAULT VALUES RETURNING id`).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
+}
+
+func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
+	// Create a new transaction from the database Connection
+	tx, err := db.Begin()
+
+	if err != nil {
+		return 0, err
+	}
+
+	// We need to either commit or rollback the transaction after it is done.
+	defer func() {
+		if err != nil {
+			// Something went wrong, rollback the transaction
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	// Get platform ID by name
+	var platformID int
+	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", params.PlatformName)
+	err = db.QueryRow(platIDQuery).Scan(&platformID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, errors.New(fmt.Sprintf("Platform name '%s' does not exist", params.PlatformName))
+		}
+
+		return 0, err
+	}
+
+	// Add the user into the credentials table
+	credentialsQuery := fmt.Sprintf(
+		"INSERT INTO credentials "+
+			"(user_id, platform_id, upid, connection_string) "+
+			"VALUES (%d, %d, '%s', '%s')",
+		params.UserID,
+		platformID,
+		params.UPID,
+		params.ConnectionString,
+	)
+
+	_, err = tx.Exec(credentialsQuery)
+	if err != nil {
+		return 0, err
+	}
+
+	// The final step is to add the user to the appropriate row in the userbase table
+	userbaseQuery := fmt.Sprintf(
+		"INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", params.UserID, params.ClientID,
+	)
+	_, err = tx.Exec(userbaseQuery)
+	if err != nil {
+		return 0, err
+	}
+
+	return params.UserID, err // err will be update by the deferred func
+}
+
+func InsertNewClient(db *sql.DB, name string, password string) (int, error) {
+	// Before we insert the password in the database, we must hash it
+	// bcrypt salts this for us, so we don't have to worry about it
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+
+	var clientID int
+	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s') RETURNING id", name, hash)
+
+	// TODO: Use ExecContext instead
+	err = db.QueryRow(insertQuery).Scan(&clientID)
+	if err != nil {
+		return 0, err
+	}
+
+	return clientID, nil
 }
 
 func GetClientSecret(db *sql.DB, fromClientID int) ([]byte, error) {
@@ -99,17 +199,6 @@ func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (in
 	return userID, nil
 }
 
-func AddUserToUserbase(db *sql.DB, userID int, clientID int) error {
-	queryString := fmt.Sprintf("INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, clientID)
-
-	_, err := db.Exec(queryString)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
 	// Check if this user exists already in the userbase
 	queryString := fmt.Sprintf(
@@ -130,73 +219,6 @@ func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {
 	}
 
 	return userID, nil
-}
-
-func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
-	// Create a new transaction from the database Connection
-	tx, err := db.Begin()
-
-	if err != nil {
-		return 0, err
-	}
-
-	// We need to either commit or rollback the transaction after it is done.
-	defer func() {
-		if err != nil {
-			// Something went wrong, rollback the transaction
-			tx.Rollback()
-		} else {
-			err = tx.Commit()
-		}
-	}()
-
-	// The first thing we need to do is to create a new user in the user table
-	var userID int
-	err = tx.QueryRow(`INSERT INTO "user" DEFAULT VALUES RETURNING id`).Scan(&userID)
-	if err != nil {
-		return 0, err
-	}
-
-	// Get platform ID by name
-	var platformID int
-	platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", params.PlatformName)
-	err = db.QueryRow(platIDQuery).Scan(&platformID)
-	if err != nil {
-
-		if err == sql.ErrNoRows {
-			return 0, errors.New(fmt.Sprintf("Platform name '%s' does not exist", params.PlatformName))
-		}
-
-		return 0, err
-	}
-
-	// Add the user into the credentials table
-	credentialsQuery := fmt.Sprintf(
-		"INSERT INTO credentials "+
-			"(user_id, platform_id, upid, connection_string) "+
-			"VALUES (%d, %d, '%s', '%s')",
-		userID,
-		platformID,
-		params.UPID,
-		params.ConnectionString,
-	)
-
-	_, err = tx.Exec(credentialsQuery)
-	if err != nil {
-		return 0, err
-	}
-
-	// The final step is to add the user to the appropriate row in the userbase table
-	userbaseQuery := fmt.Sprintf(
-		"INSERT INTO userbase (user_id, client_id) VALUES (%d, %d)", userID, params.ClientID,
-	)
-
-	_, err = tx.Exec(userbaseQuery)
-	if err != nil {
-		return 0, err
-	}
-
-	return userID, err // err will be update by the deferred func
 }
 
 // TODO: Make it so auth type is not hardcoded in the SQL stmt
@@ -310,10 +332,11 @@ func GetPlatformDomains(db *sql.DB) (map[string]string, error) {
 	return domains, nil
 }
 
-// CheckClientName takes in a client name, and returns the userId of the client,
-// or 0 if no client is using that name
-func CheckClientName(db *sql.DB, name string) (int, error) {
-	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name = '%s'", name)
+// GetClientID takes in a client name, and returns the ID of the client,
+// or 0 if no client is using that name.
+func GetClientID(db *sql.DB, clientName string) (int, error) {
+	searchQuery := fmt.Sprintf("SELECT id FROM client WHERE name = '%s'", clientName)
+
 	var userId int
 	err := db.QueryRow(searchQuery).Scan(&userId) // TODO: Use QueryRowContext instead
 	if err != nil {
@@ -326,39 +349,6 @@ func CheckClientName(db *sql.DB, name string) (int, error) {
 		}
 	}
 
-	return userId, nil
-}
-
-func CreateNewClient(db *sql.DB, name string, password string) (int, error) {
-	// Before we insert the password in the database, we must hash it
-	// bcrypt salts this for us, so we don't have to worry about it
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return 0, err
-	}
-	var clientID int
-	insertQuery := fmt.Sprintf("INSERT INTO client (name, password) VALUES ('%s','%s') RETURNING id", name, hash)
-	// TODO: Use ExecContext instead
-	err = db.QueryRow(insertQuery).Scan(&clientID)
-	if err != nil {
-		return 0, err
-	}
-
-	return clientID, nil
-}
-
-func SignInClient(db *sql.DB, name string, enteredPassword string) (int, error) {
-	searchQuery := fmt.Sprintf("SELECT password, id FROM client WHERE name = '%s'", name)
-	var passwordResult string
-	var userId int
-	err := db.QueryRow(searchQuery).Scan(&passwordResult, &userId)
-	if err != nil {
-		return 0, err
-	}
-	err = bcrypt.CompareHashAndPassword([]byte(passwordResult), []byte(enteredPassword))
-	if err != nil {
-		return userId, err
-	}
 	return userId, nil
 }
 
@@ -410,6 +400,24 @@ func UpdateCredentialsUsingOAuth2Tokens(db *sql.DB, userID int, tokens *oauth2.T
 	}
 
 	return nil
+}
+
+func SignInClient(db *sql.DB, clientName string, enteredPassword string) (int, error) {
+	searchQuery := fmt.Sprintf("SELECT password, id FROM client WHERE name = '%s'", clientName)
+
+	var passwordResult string
+	var userID int
+	err := db.QueryRow(searchQuery).Scan(&passwordResult, &userID)
+	if err != nil {
+		return 0, err
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(passwordResult), []byte(enteredPassword))
+	if err != nil {
+		return userID, err
+	}
+
+	return userID, nil
 }
 
 func checkClientExistence(db *sql.DB, clientID int) (bool, error) {
