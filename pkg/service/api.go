@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"time"
 
-
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -426,7 +425,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the name already exists. This should probably be done already before SignUp is called
-	userId, err := dal.GetClientID(api.db, clientName)
+	clientID, err := dal.GetClientID(api.db, clientName)
 	if err != nil {
 		response := ClientSignUpResponse{
 			Success: false,
@@ -442,7 +441,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userId != 0 {
+	if clientID != 0 {
 		response := ClientSignUpResponse{
 			Success: false,
 			Error:   "Client name already taken",
@@ -457,9 +456,9 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientPassWord := r.Form.Get("password")
+	clientPassword := r.Form.Get("password")
 
-	if clientPassWord == "" {
+	if clientPassword == "" {
 		response := ClientSignUpResponse{
 			Success: false,
 			Error:   "Expected parameter 'password' in request",
@@ -474,7 +473,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientID, err := dal.InsertNewClient(api.db, clientName, clientPassWord)
+	newClientID, err := dal.InsertNewClient(api.db, clientName, clientPassword)
 	if err != nil {
 		api.respondWithError(w, http.StatusInternalServerError, "Error occurred while attempting to create client")
 		api.log.WithFields(logrus.Fields{
@@ -488,7 +487,7 @@ func (api *Api) SignUp(w http.ResponseWriter, r *http.Request) {
 	// Send a success message back
 	response := ClientSignUpResponse{
 		Success:    true,
-		ClientID:   clientID,
+		ClientID:   newClientID,
 		ClientName: clientName,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
