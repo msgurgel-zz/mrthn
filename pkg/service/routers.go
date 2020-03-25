@@ -97,12 +97,29 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Rout
 		},
 
 		Route{
+			"GetLargestUserCalories",
+			"GET",
+			"/user/{userID}/calories/largest",
+			true,
+			false,
+			api.GetLargestUserCalories,
+		},
+
+		Route{
 			"GetUserSteps",
 			"GET",
 			"/user/{userID}/steps",
 			true,
 			false,
 			api.GetUserSteps,
+		},
+		Route{
+			"GetLargestUserSteps",
+			"GET",
+			"/user/{userID}/steps/largest",
+			true,
+			false,
+			api.GetLargestSteps,
 		},
 
 		Route{
@@ -112,6 +129,15 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Rout
 			true,
 			false,
 			api.GetUserDistance,
+		},
+
+		Route{
+			"GetLargestUserDistance",
+			"GET",
+			"/user/{userID}/distance/largest",
+			true,
+			false,
+			api.GetLargestDistance,
 		},
 
 		Route{

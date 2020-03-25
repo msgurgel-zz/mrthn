@@ -103,6 +103,14 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
+	api.getCalories(w, r, false)
+}
+
+func (api *Api) GetLargestUserCalories(w http.ResponseWriter, r *http.Request) {
+	api.getCalories(w, r, true)
+}
+
+func (api *Api) getCalories(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
 	if err != nil {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
@@ -112,7 +120,7 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date)
+	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date, onlyReturnLargestValue)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -127,6 +135,14 @@ func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
+	api.getDistance(w, r, false)
+}
+
+func (api *Api) GetLargestDistance(w http.ResponseWriter, r *http.Request) {
+	api.getDistance(w, r, true)
+}
+
+func (api *Api) getDistance(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserDistance"})
 	if err != nil {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
@@ -136,7 +152,7 @@ func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	distanceValues, err := model.GetUserDistance(api.db, api.log, userID, date)
+	distanceValues, err := model.GetUserDistance(api.db, api.log, userID, date, onlyReturnLargestValue)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -151,6 +167,14 @@ func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
+	api.getSteps(w, r, false)
+}
+
+func (api *Api) GetLargestSteps(w http.ResponseWriter, r *http.Request) {
+	api.getSteps(w, r, true)
+}
+
+func (api *Api) getSteps(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
 	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
 	if err != nil {
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
@@ -161,7 +185,7 @@ func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date)
+	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date, onlyReturnLargestValue)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())

@@ -19,7 +19,7 @@ type ValueResult struct {
 }
 
 // TODO: Can this be refactored, so there isn't as much copied code from GetUserSteps?
-func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
 	platforms, err := getPlatforms(db, userID, log)
 	if err != nil {
 		return nil, err
@@ -50,10 +50,16 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time)
 	if len(caloriesValues) == 0 {
 		return nil, errors.New("could not connect to any platforms, try again later")
 	}
+
+	// If the user only wants the largest amount, filter out the other results
+	if maxAmount {
+		return filterNonLargest(caloriesValues), nil
+	}
+
 	return caloriesValues, nil
 }
 
-func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
 	platforms, err := getPlatforms(db, userID, log)
 	if err != nil {
 		return nil, err
@@ -84,10 +90,16 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([
 	if len(stepsValues) == 0 {
 		return nil, errors.New("could not connect to any platforms, try again later")
 	}
+
+	// If the user only wants the largest amount, filter out the other results
+	if maxAmount {
+		return filterNonLargest(stepsValues), nil
+	}
+
 	return stepsValues, nil
 }
 
-func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time) ([]ValueResult, error) {
+func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
 	platforms, err := getPlatforms(db, userID, log)
 	if err != nil {
 		return nil, err
@@ -118,6 +130,12 @@ func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time)
 	if len(distanceValues) == 0 {
 		return nil, errors.New("could not connect to any platforms, try again later")
 	}
+
+	// If the user only wants the largest amount, filter out the other results
+	if maxAmount {
+		return filterNonLargest(distanceValues), nil
+	}
+
 	return distanceValues, nil
 }
 
@@ -134,4 +152,26 @@ func getPlatforms(db *sql.DB, userID int, log *logrus.Logger) ([]platform.Platfo
 
 	platforms := platform.GetPlatforms(platformStr)
 	return platforms, nil
+}
+
+func filterNonLargest(resultValues []ValueResult) []ValueResult {
+
+	if len(resultValues) <= 1 {
+		return resultValues
+	}
+
+	var maxValue float64 = 0
+	var maxIndex = 0
+
+	for index, caloriesValue := range resultValues {
+		if caloriesValue.Value >= maxValue {
+			maxIndex = index
+			maxValue = caloriesValue.Value
+		}
+	}
+
+	var maxCaloriesValue []ValueResult
+	maxCaloriesValue = append(maxCaloriesValue, resultValues[maxIndex])
+
+	return maxCaloriesValue
 }

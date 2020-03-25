@@ -86,9 +86,55 @@ class SandwichTest < Minitest::Test
 
                 assert_equal 'google', parsed["calories"][1]["platform"]
                 assert_equal 1635, parsed["calories"][1]["value"]
-
-
     end
+
+    def test_get_max_calories
+                response = HTTParty.get('http://localhost:8080/user/3/calories/max?date=2020-02-13', {
+                    headers: {
+                        "User-Agent" => "Sandwich",
+                        "Authorization" => "Bearer #{@jwt}",
+                        }
+                    })
+
+                    parsed = JSON.parse(response.body)
+                    assert_equal 3, parsed["id"]
+
+                    # There should only be the google platform returned, because it has more calories than Fitbit
+                    assert_equal 'google', parsed["calories"][0]["platform"]
+                    assert_equal 1635, parsed["calories"][0]["value"]
+    end
+
+    def test_get_max_steps
+                    response = HTTParty.get('http://localhost:8080/user/3/steps/max?date=2020-02-13', {
+                        headers: {
+                            "User-Agent" => "Sandwich",
+                            "Authorization" => "Bearer #{@jwt}",
+                            }
+                        })
+
+                        parsed = JSON.parse(response.body)
+                        assert_equal 3, parsed["id"]
+
+                        # The Fitbit platform has more steps than Google, so it should return the Fitbit Amount
+                        assert_equal 'fitbit', parsed["steps"][0]["platform"]
+                        assert_equal 2020, parsed["steps"][0]["value"]
+    end
+
+    def test_get_max_distance
+                        response = HTTParty.get('http://localhost:8080/user/3/distance/max?date=2020-02-13', {
+                            headers: {
+                                "User-Agent" => "Sandwich",
+                                "Authorization" => "Bearer #{@jwt}",
+                                }
+                            })
+
+                            parsed = JSON.parse(response.body)
+                            assert_equal 3, parsed["id"]
+
+                            # Google has more distance than fitbit
+                            assert_equal 'google', parsed["distance"][0]["platform"]
+                            assert_equal 3.456, parsed["distance"][0]["value"]
+        end
 
     def test_client_signup_name_already_taken
         response = HTTParty.post(
