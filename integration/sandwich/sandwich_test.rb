@@ -69,6 +69,20 @@ class SandwichTest < Minitest::Test
             assert_equal 3.456, parsed["distance"][0]["value"]
     end
 
+    def test_get_distance_strava
+            response = HTTParty.get('http://localhost:8080/user/4/distance?date=2020-02-13', {
+                headers: {
+                    "User-Agent" => "Sandwich",
+                    "Authorization" => "Bearer #{@jwt}",
+                    }
+                })
+
+                parsed = JSON.parse(response.body)
+                assert_equal 4, parsed["id"]
+                assert_equal 'strava', parsed["distance"][0]["platform"]
+                assert_equal 1.304, parsed["distance"][0]["value"]
+    end
+
     def test_get_calories_all_platforms
             response = HTTParty.get('http://localhost:8080/user/3/calories?date=2020-02-13', {
                 headers: {
@@ -86,10 +100,13 @@ class SandwichTest < Minitest::Test
 
                 assert_equal 'google', parsed["calories"][1]["platform"]
                 assert_equal 1635, parsed["calories"][1]["value"]
+
+                assert_equal 'strava', parsed["calories"][2]["platform"]
+                assert_equal 938, parsed["calories"][2]["value"]
     end
 
     def test_get_max_calories
-                response = HTTParty.get('http://localhost:8080/user/3/calories/max?date=2020-02-13', {
+                response = HTTParty.get('http://localhost:8080/user/3/calories/largest?date=2020-02-13', {
                     headers: {
                         "User-Agent" => "Sandwich",
                         "Authorization" => "Bearer #{@jwt}",
@@ -105,7 +122,7 @@ class SandwichTest < Minitest::Test
     end
 
     def test_get_max_steps
-                    response = HTTParty.get('http://localhost:8080/user/3/steps/max?date=2020-02-13', {
+                    response = HTTParty.get('http://localhost:8080/user/3/steps/largest?date=2020-02-13', {
                         headers: {
                             "User-Agent" => "Sandwich",
                             "Authorization" => "Bearer #{@jwt}",
@@ -121,7 +138,7 @@ class SandwichTest < Minitest::Test
     end
 
     def test_get_max_distance
-                        response = HTTParty.get('http://localhost:8080/user/3/distance/max?date=2020-02-13', {
+                        response = HTTParty.get('http://localhost:8080/user/3/distance/largest?date=2020-02-13', {
                             headers: {
                                 "User-Agent" => "Sandwich",
                                 "Authorization" => "Bearer #{@jwt}",

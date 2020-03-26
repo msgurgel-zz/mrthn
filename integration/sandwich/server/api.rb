@@ -28,7 +28,6 @@ module TestServer
            end
        end
 
-
        # Mocks Google endpoints
        resource :google do
             resource :fitness do
@@ -84,5 +83,29 @@ module TestServer
                 end
             end
        end
+
+
+       # Mocks Strava endpoints
+       resource :strava do
+              resource :athlete do
+                     get :"activities" do
+
+                            [
+                                {
+                                    distance: 1304,
+                                    kilojoules: 4520
+                                }
+
+                            ]
+
+                     end
+              end
+       end
+
+
     end
+
+
+
+
 end

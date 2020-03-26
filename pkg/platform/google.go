@@ -67,12 +67,12 @@ type GoogleFitWholeResponse struct {
 	Error   Error    `json:"error,omitempty"`
 }
 
-func (f Google) Name() string {
+func (g Google) Name() string {
 	return "google"
 }
 
-func (f Google) GetSteps(userID int, date time.Time) (int, error) {
-	response, err := f.makeGoogleFitRequest(userID, date, aggregatedStepsID)
+func (g Google) GetSteps(userID int, date time.Time) (int, error) {
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedStepsID)
 	if err != nil {
 		return 0, err
 	}
@@ -87,8 +87,8 @@ func (f Google) GetSteps(userID int, date time.Time) (int, error) {
 
 }
 
-func (f Google) GetCalories(userID int, date time.Time) (int, error) {
-	response, err := f.makeGoogleFitRequest(userID, date, aggregatedCaloriesID)
+func (g Google) GetCalories(userID int, date time.Time) (int, error) {
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedCaloriesID)
 
 	if err != nil {
 		return 0, err
@@ -102,8 +102,8 @@ func (f Google) GetCalories(userID int, date time.Time) (int, error) {
 	return int(intValue.(float64)), nil
 }
 
-func (f Google) GetDistance(userID int, date time.Time) (float64, error) {
-	response, err := f.makeGoogleFitRequest(userID, date, aggregatedDistanceID)
+func (g Google) GetDistance(userID int, date time.Time) (float64, error) {
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID)
 	if err != nil {
 		return 0, err
 	}
@@ -117,33 +117,33 @@ func (f Google) GetDistance(userID int, date time.Time) (float64, error) {
 	return floatValue.(float64) / 1000, nil
 }
 
-func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string) (GoogleValuesResponse, error) {
+func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string) (GoogleValuesResponse, error) {
 	// Get Access Token associated with user from db
-	tokens, err := dal.GetUserTokens(f.db, userID, f.Name())
+	tokens, err := dal.GetUserTokens(g.db, userID, g.Name())
 
 	// Before we can make the request, refresh the access tokens
-	newTokens, err := auth.RefreshOAuth2Tokens(tokens, f.authorization)
+	newTokens, err := auth.RefreshOAuth2Tokens(tokens, g.authorization)
 	if err != nil {
 		return GoogleValuesResponse{}, err
 	}
 
 	if newTokens.AccessToken != tokens.AccessToken {
 		// Tokens were updated, let's update the database
-		err := dal.UpdateCredentialsUsingOAuth2Tokens(f.db, userID, newTokens)
+		err := dal.UpdateCredentialsUsingOAuth2Tokens(g.db, userID, newTokens)
 		if err != nil {
 			return GoogleValuesResponse{}, errors.New("failed to update db with new oauth2 tokens: " + err.Error())
 		}
 
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"user":   userID,
 			"expiry": newTokens.Expiry,
 		}).Info("updated access token")
 	}
 
 	// Tokens were refreshed. Prepare to make the request.
-	client := f.authorization.Client(context.Background(), newTokens)
+	client := g.authorization.Client(context.Background(), newTokens)
 
-	url := f.domain + googleFitEndpoint
+	url := g.domain + googleFitEndpoint
 
 	UnixTimeDateInt := date.UnixNano() / 1000000
 	UnixTimeLimit := UnixTimeDateInt + millisecondsInADay
@@ -166,7 +166,7 @@ func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	})
 
 	if err != nil {
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"error":           err.Error(),
 			"aggregateBy":     aggregateBy,
 			"bucketByTime":    bucketByTime,
@@ -179,7 +179,7 @@ func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed to request data from Google Fit")
 
@@ -188,7 +188,7 @@ func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("failed to read response data from Google Fit")
 
@@ -200,7 +200,7 @@ func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	responseValue := GoogleFitWholeResponse{}
 	err = json.Unmarshal(body, &responseValue)
 	if err != nil {
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"error":        err.Error(),
 			"responseBody": string(body),
 		}).Error("failed to unmarshal Google Fit response")
@@ -210,7 +210,7 @@ func (f Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 
 	// First, check if there was an error in the response
 	if responseValue.Error.Message != "" {
-		f.log.WithFields(logrus.Fields{
+		g.log.WithFields(logrus.Fields{
 			"error":        responseValue.Error.Message,
 			"code":         responseValue.Error.Code,
 			"responseBody": string(body),
