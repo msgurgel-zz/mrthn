@@ -43,6 +43,13 @@ func InitializePlatforms(db *sql.DB, log *logrus.Logger, authTypes auth.Types) {
 		domain:        domains["google"],
 		authorization: authTypes.Oauth2.Configs["google"],
 	}
+
+	Platforms["strava"] = Strava{
+		db:            db,
+		log:           log,
+		domain:        domains["strava"],
+		authorization: authTypes.Oauth2.Configs["strava"],
+	}
 }
 
 func GetPlatforms(platformNames []string) []Platform {

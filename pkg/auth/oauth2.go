@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -153,6 +154,24 @@ func (o *OAuth2) ObtainUserTokens(stateKey string, code string) (result OAuth2Re
 
 		return googleOauth2Result, returnedState.Callback, nil
 
+	case "strava":
+		// Exchange the code received for an access and refresh token
+		tokens, err := o.Configs["strava"].Exchange(context.Background(), code)
+		if err != nil {
+			return OAuth2Result{}, returnedState.Callback, err
+		}
+
+		// Prepare results
+		stravaOauth2Result := OAuth2Result{
+			Token:        tokens,
+			ClientID:     returnedState.ClientID,
+			UserID:       returnedState.UserID,
+			PlatformName: returnedState.Platform,
+			PlatformID:   fmt.Sprintf("%f", tokens.Extra("athlete").(map[string]interface{})["id"].(float64)),
+		}
+
+		return stravaOauth2Result, returnedState.Callback, nil
+
 	default:
 		return OAuth2Result{}, returnedState.Callback, errors.New(returnedState.Platform + " service does not exist")
 	}
@@ -217,6 +236,17 @@ func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2
 		ClientSecret: configs.Google.ClientSecret,
 		Scopes:       []string{"https://www.googleapis.com/auth/fitness.activity.read", "https://www.googleapis.com/auth/fitness.location.read", "https://www.googleapis.com/auth/gmail.readonly"},
 		Endpoint:     endpoints.Google,
+	}
+
+	OAuthConfigs["strava"] = &oauth2.Config{
+		RedirectURL:  configs.Callback,
+		ClientID:     configs.Strava.ClientID,
+		ClientSecret: configs.Strava.ClientSecret,
+		Scopes:       []string{"read,read_all,profile:read_all,activity:read_all"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://www.strava.com/oauth/authorize?redirect_uri=" + configs.Callback,
+			TokenURL: "https://www.strava.com/api/v3/oauth/token",
+		},
 	}
 
 	return OAuthConfigs

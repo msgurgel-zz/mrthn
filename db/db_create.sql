@@ -37,3 +37,4 @@ VALUES ('Passive Marathon', 'bad_hash', 'test_callback');
 
 INSERT INTO platform (name, domain) VALUES ('google', 'https://www.googleapis.com/fitness/v1');
 INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1');
+INSERT INTO platform (name, domain) VALUES ('strava', 'https://www.strava.com/api/v3');
