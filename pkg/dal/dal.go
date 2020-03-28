@@ -113,6 +113,12 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 		return 0, err
 	}
 
+	// Hash the user UPID before inserting it into the database
+	hashedUPID, err := bcrypt.GenerateFromPassword([]byte(params.UPID), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+
 	// Add the user into the credentials table
 	credentialsQuery := fmt.Sprintf(
 		"INSERT INTO credentials "+
@@ -120,7 +126,7 @@ func InsertUserCredentials(db *sql.DB, params CredentialParams) (int, error) {
 			"VALUES (%d, %d, '%s', '%s')",
 		params.UserID,
 		platformID,
-		params.UPID,
+		hashedUPID,
 		params.ConnectionString,
 	)
 
@@ -173,30 +179,64 @@ func GetClientSecret(db *sql.DB, fromClientID int) ([]byte, error) {
 }
 
 func GetUserByPlatformID(db *sql.DB, platformID string, platformName string) (int, error) {
-	var userID int
+
+	// We are unfortunately going to have to search every user in the platform to check if they exist
 
 	// Check if this user exists in the credentials
 	queryString := fmt.Sprintf(
-		"SELECT user_id FROM credentials c "+
+		"SELECT upid, user_id FROM credentials c "+
 			"JOIN platform p ON c.platform_id = p.id "+
-			"WHERE p.name = '%s' AND c.upid = '%s'",
+			"WHERE p.name = '%s'",
 		platformName,
-		platformID,
 	)
 
-	err := db.QueryRow(queryString).Scan(&userID)
+	rows, err := db.Query(queryString)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			// There were no rows, but otherwise no error occurred.
-			// Return a zero
-			return 0, nil
-		} else {
+		return 0, err
+	}
+
+	// To avoid memory leakage, this needs to close after we are done with the rows result
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID int
+		var userPUID string
+
+		err = rows.Scan(&userPUID, &userID)
+
+		if err != nil {
 			return 0, err
+		}
+
+		// Check if this user is the user attempting to sign up.
+		err = bcrypt.CompareHashAndPassword([]byte(userPUID), []byte(platformID))
+
+		// Since a nil is a success, check that an error WASN'T returned
+		if err == nil {
+			return userID, err
 		}
 	}
 
-	return userID, nil
+	// If we reached this far, none of the rows returned contained the user
+	return 0, nil
+
+	/*
+		err = db.QueryRow(queryString).Scan(&userID)
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// There were no rows, but otherwise no error occurred.
+				// Return a zero
+				return 0, nil
+			} else {
+				return 0, err
+			}
+		}
+
+		return userID, nil
+	*/
+
 }
 
 func GetUserInUserbase(db *sql.DB, userID int, clientID int) (int, error) {

@@ -27,7 +27,7 @@ CREATE TABLE credentials(
     id                SERIAL      PRIMARY KEY,
     user_id           INTEGER     REFERENCES "user"(id),
     platform_id       INTEGER     REFERENCES platform(id),
-    upid              VARCHAR(32) NOT NULL, -- User-Platform ID (ID of an user for an specific platform)
+    upid              BYTEA NOT NULL, -- User-Platform ID (ID of an user for an specific platform)
     connection_string TEXT        NOT NULL
 );
 CREATE INDEX credentials_upid_index ON credentials(upid);

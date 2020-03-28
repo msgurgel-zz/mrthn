@@ -158,18 +158,19 @@ func TestGetUserByPlatformID(t *testing.T) {
 	platName := "fitbit"
 	expectedUserID := 420
 
+	upidHash, err := bcrypt.GenerateFromPassword([]byte(platID), bcrypt.DefaultCost)
+
 	cols := []string{
-		"user_id",
+		"upid", "user_id",
 	}
 
-	rows := sqlmock.NewRows(cols).AddRow(expectedUserID)
+	rows := sqlmock.NewRows(cols).AddRow(upidHash, expectedUserID)
 
 	expectedSQL := fmt.Sprintf(
-		"^SELECT user_id FROM credentials [a-z] "+
+		"^SELECT upid, user_id FROM credentials [a-z] "+
 			"JOIN platform [a-z]+ ON (.+) "+
-			"WHERE [a-z]+.name = '%s' AND [a-z]+.upid = '%s'$",
+			"WHERE [a-z]+.name = '%s'$",
 		platName,
-		platID,
 	)
 	Mock.ExpectQuery(expectedSQL).WillReturnRows(rows)
 
