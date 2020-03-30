@@ -623,7 +623,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 	if newCallback == "" {
 		response := CallbackUpdateResponse{
 			Success: false,
-			Error:   "Expected parameter 'name' in request",
+			Error:   "Expected parameter 'callback' in request",
 		}
 		api.respondWithJSON(w, http.StatusBadRequest, response)
 
