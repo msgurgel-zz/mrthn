@@ -35,7 +35,7 @@ type ClientSignUpResponse struct {
 
 type ClientSignInResponse struct {
 	Success  bool   `json:"success"`
-	ClientID int    `json:"userID,omitempty"`
+	ClientID int    `json:"clientID,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
 
