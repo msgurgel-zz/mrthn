@@ -599,7 +599,7 @@ func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 		Success:  true,
 		ClientID: clientID,
 	}
-	api.respondWithJSON(w, http.StatusBadRequest, response)
+	api.respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
