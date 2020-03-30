@@ -603,7 +603,7 @@ func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(500)
 	if err != nil {
 		response := CallbackUpdateResponse{
 			Success: false,
@@ -697,7 +697,7 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 		Success:         true,
 		UpdatedCallback: newCallback,
 	}
-	api.respondWithJSON(w, http.StatusInternalServerError, response)
+	api.respondWithJSON(w, http.StatusOK, response)
 }
 
 // Private Functions
