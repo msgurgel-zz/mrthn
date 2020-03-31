@@ -382,6 +382,25 @@ func UpdateCredentials(db *sql.DB, userID int, credentialsString string) error {
 	return nil
 }
 
+func GetClientCallback(db *sql.DB, clientID int) (string, error) {
+	searchQuery := fmt.Sprintf("SELECT callback FROM client WHERE id = %d", clientID)
+
+	var callbackResult string
+	err := db.QueryRow(searchQuery).Scan(&callbackResult) // TODO: Use QueryRowContext instead
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// There were no rows, but otherwise no error occurred.
+			// Received a client ID that doesn't exist
+			return "", nil
+		} else {
+			return "", err
+		}
+	}
+
+	// We found a result, return it
+	return callbackResult, nil
+}
+
 func UpdateCredentialsUsingOAuth2Tokens(db *sql.DB, userID int, tokens *oauth2.Token) error {
 	connStr, err := helpers.FormatConnectionString([]string{
 		"oauth2",

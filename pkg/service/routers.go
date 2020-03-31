@@ -168,6 +168,15 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Rout
 		},
 
 		Route{
+			"Callback",
+			"GET",
+			"/client/{clientID}/callback",
+			false,
+			true,
+			api.GetClientCallback,
+		},
+
+		Route{
 			"SignUp",
 			"POST",
 			"/signup",
