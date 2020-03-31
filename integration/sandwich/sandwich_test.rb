@@ -226,12 +226,13 @@ class SandwichTest < Minitest::Test
 
     def test_client_signin_wrong_password
         response = HTTParty.post('http://localhost:8080/signin', {
+            :multipart => true,
             :body => {
                 :name => 'Sandwich',
                 :password => 'Bad_Password'
             },
             :headers => {
-                'Content-Type' => 'application/x-www-form-urlencoded',
+                'Content-Type' => 'multipart/form-data',
                 'Origin' => 'https://marathon-18119.firebaseapp.com'
             }
         })
@@ -243,11 +244,12 @@ class SandwichTest < Minitest::Test
 
     def test_client_update_callback_incorrect_client
             response = HTTParty.post('http://localhost:8080/client/34/callback', {
+                :multipart => true,
                 :body => {
                     :callback => 'Sandwich'
                 },
                 :headers => {
-                    'Content-Type' => 'application/x-www-form-urlencoded',
+                    'Content-Type' => 'multipart/form-data',
                     'Origin' => 'https://marathon-18119.firebaseapp.com'
                 }
             })
@@ -259,11 +261,12 @@ class SandwichTest < Minitest::Test
 
     def test_client_update_callback_non_integer_clientID
                 response = HTTParty.post('http://localhost:8080/client/notaninteger/callback', {
+                    :multipart => true,
                     :body => {
                         :callback => 'Sandwich'
                     },
                     :headers => {
-                        'Content-Type' => 'application/x-www-form-urlencoded',
+                        'Content-Type' => 'multipart/form-data',
                         'Origin' => 'https://marathon-18119.firebaseapp.com'
                     }
                 })
@@ -275,11 +278,12 @@ class SandwichTest < Minitest::Test
 
     def test_client_update_callback_correct_call
                     response = HTTParty.post('http://localhost:8080/client/1/callback', {
+                        :multipart => true,
                         :body => {
                             :callback => 'Sandwich_callback'
                         },
                         :headers => {
-                            'Content-Type' => 'application/x-www-form-urlencoded',
+                            'Content-Type' => 'multipart/form-data',
                             'Origin' => 'https://marathon-18119.firebaseapp.com'
                         }
                     })

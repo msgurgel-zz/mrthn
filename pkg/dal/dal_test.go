@@ -550,3 +550,46 @@ func TestInsertNewUser_ShouldInsertUser(t *testing.T) {
 
 	assert.Equal(t, 1, userID)
 }
+
+func TestGetClientCallback_ShouldGetClientCallback(t *testing.T) {
+	clientID := 1
+	callback := "testCallback"
+
+	Mock.ExpectQuery(
+		fmt.Sprintf("SELECT callback FROM client WHERE id = %d", clientID)).
+		WillReturnRows(sqlmock.NewRows([]string{"callback"}).AddRow(callback))
+
+	// Call the function we are testing
+	callbackResult, err := GetClientCallback(DB, clientID)
+	if err != nil {
+		t.Errorf("error was not expected when getting a client callback: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	assert.Equal(t, callback, callbackResult)
+}
+
+func TestGetClientCallback_NoClientShouldReturnBlank(t *testing.T) {
+	clientID := 1
+
+	Mock.ExpectQuery(
+		fmt.Sprintf("SELECT callback FROM client WHERE id = %d", clientID)).
+		WillReturnRows(sqlmock.NewRows([]string{"callback"}))
+
+	// Call the function we are testing
+	callbackResult, err := GetClientCallback(DB, clientID)
+	if err != nil {
+		t.Errorf("error was not expected when getting a client callback: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := Mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	assert.Equal(t, "", callbackResult)
+}

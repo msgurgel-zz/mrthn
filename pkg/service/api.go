@@ -602,6 +602,75 @@ func (api *Api) SignIn(w http.ResponseWriter, r *http.Request) {
 	api.respondWithJSON(w, http.StatusOK, response)
 }
 
+func (api *Api) GetClientCallback(w http.ResponseWriter, r *http.Request) {
+
+	vars := mux.Vars(r)
+	if vars["clientID"] == "" {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "missing clientID",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func": "GetClientCallback",
+			"err":  "clientID not received",
+		}).Error("failed to parse client 'clientID' parameter")
+	}
+
+	clientID, err := strconv.Atoi(vars["clientID"])
+	if err != nil {
+		response := CallbackUpdateResponse{
+			Success: false,
+			Error:   "clientID must be an integer",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		api.log.WithFields(logrus.Fields{
+			"func":     "GetClientCallback",
+			"err":      "clientID received must be an integer",
+			"received": vars["clientID"],
+		}).Error("failed to parse client 'clientID' parameter")
+
+		return
+	}
+
+	// Attempt to find the callback of the client
+	callback, err := dal.GetClientCallback(api.db, clientID)
+
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"func": "GetClientCallback",
+			"err":  err.Error(),
+		}).Error("error occurred when retrieving client callback")
+
+		response := GetCallbackResponse{
+			Success: false,
+			Error:   "Error occurred while retrieving client callback",
+		}
+		api.respondWithJSON(w, http.StatusInternalServerError, response)
+
+		return
+	}
+
+	if callback == "" {
+		response := GetCallbackResponse{
+			Success: false,
+			Error:   "No client matches passed in clientID",
+		}
+		api.respondWithJSON(w, http.StatusBadRequest, response)
+
+		return
+	}
+
+	response := GetCallbackResponse{
+		Success:  true,
+		Callback: callback,
+	}
+	api.respondWithJSON(w, http.StatusOK, response)
+
+}
+
 func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(500)
 	if err != nil {
