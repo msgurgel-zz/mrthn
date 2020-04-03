@@ -864,7 +864,14 @@ func (api *Api) createUser(Oauth2Params *auth.OAuth2Result) (int, error) {
 
 	if userID != 0 {
 		// This user already exists in the Marathon User table.
-		// However, the user may not exist in the clients userbase.
+
+		// Update their credentials, since they logged in again
+		err = dal.UpdateCredentialsUsingOAuth2Tokens(api.db, userID, Oauth2Params.Token)
+		if err != nil {
+			return 0, err
+		}
+
+		// The user may not exist in the clients userbase.
 		// Check if they do.
 		userID, err := dal.GetUserInUserbase(api.db, userID, Oauth2Params.ClientID)
 		if err != nil {
