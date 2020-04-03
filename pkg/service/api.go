@@ -228,7 +228,6 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Get the other URL params
 	service, serviceOk := r.URL.Query()["service"]
-	callbackURL, callbackOk := r.URL.Query()["callback"]
 	userIDStrings, userIDOk := r.URL.Query()["userID"] // Optional param. Used when adding a new platform account to existing user
 
 	// Validate service param in URL
@@ -257,22 +256,22 @@ func (api *Api) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate callback param in URL
-	if !callbackOk || len(callbackURL) != 1 {
-		api.log.WithFields(logrus.Fields{
-			"func":     "Login",
-			"clientID": parseToken.clientID,
-		}).Error("missing URL param 'callback'")
-
-		api.respondWithError(w, http.StatusBadRequest,
-			"expected single 'callback' parameter to contain valid callback url")
-
-		return
-	}
-
 	// Add validated service and callback to the params struct
 	params.Service = service[0]
-	params.CallbackURL = callbackURL[0]
+
+	// Get callback URL from database
+	callback, err := dal.GetClientCallback(api.db, parseToken.clientID)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"client": parseToken.clientID,
+			"err":    err,
+		}).Error("failed to get callback url from database")
+		api.respondWithError(w, http.StatusInternalServerError,
+			"Unable to retrieve callback URL. Did you remember to set it in your Profile page at https://mrthn.dev ? ",
+		)
+		return
+	}
+	params.CallbackURL = callback
 
 	// Check if the optional parameter userID was given
 	if userIDOk {
