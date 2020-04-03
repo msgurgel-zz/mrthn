@@ -41,6 +41,17 @@ type GoogleFitRequest struct {
 	EndTimeMillis   int64               `json:"endTimeMillis"`
 }
 
+// periodToMilliseconds maps a valid period string to their corresponding milliseconds
+var periodToMilliseconds = map[string]int64{
+	"1d":  86400000,
+	"7d":  608400000,
+	"30d": 2592000000,
+	"1w":  608400000,
+	"1m":  2592000000,
+	"3m":  7776000000,
+	"6m":  23330000000,
+}
+
 // GoogleValueResponse is the struct that contains the value of the datapoint we requested from Google Fit
 type GoogleValuesResponse = []map[string]interface{}
 
@@ -72,7 +83,7 @@ func (g Google) Name() string {
 }
 
 func (g Google) GetSteps(userID int, date time.Time) (int, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedStepsID)
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedStepsID, "")
 	if err != nil {
 		return 0, err
 	}
@@ -88,7 +99,7 @@ func (g Google) GetSteps(userID int, date time.Time) (int, error) {
 }
 
 func (g Google) GetCalories(userID int, date time.Time) (int, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedCaloriesID)
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedCaloriesID, "")
 
 	if err != nil {
 		return 0, err
@@ -103,7 +114,7 @@ func (g Google) GetCalories(userID int, date time.Time) (int, error) {
 }
 
 func (g Google) GetDistance(userID int, date time.Time) (float64, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID)
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, "")
 	if err != nil {
 		return 0, err
 	}
@@ -117,7 +128,22 @@ func (g Google) GetDistance(userID int, date time.Time) (float64, error) {
 	return floatValue.(float64) / 1000, nil
 }
 
-func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string) (GoogleValuesResponse, error) {
+func (g Google) GetDistanceOverPeriod(userID int, date time.Time, period string) (float64, error) {
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, period)
+	if err != nil {
+		return 0, err
+	}
+
+	if response == nil {
+		return 0, nil
+	}
+
+	floatValue := response[0]["fpVal"]
+	// Divide the result by 1000, because Google Fit returns meters when we want km
+	return floatValue.(float64) / 1000, nil
+}
+
+func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string, period string) (GoogleValuesResponse, error) {
 	// Get Access Token associated with user from db
 	tokens, err := dal.GetUserTokens(g.db, userID, g.Name())
 
@@ -146,7 +172,26 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	url := g.domain + googleFitEndpoint
 
 	UnixTimeDateInt := date.UnixNano() / 1000000
-	UnixTimeLimit := UnixTimeDateInt + millisecondsInADay
+
+	var UnixTimeLimit int64
+	// If the user only entered the date, just add the amount of milliseconds in a day to the time limit
+	if period == "" {
+		UnixTimeLimit = UnixTimeDateInt + millisecondsInADay
+	} else {
+		// Get the appropriate amount of milliseconds from the map
+		if millisecondValue, ok := periodToMilliseconds[period]; ok {
+			UnixTimeLimit = UnixTimeDateInt + millisecondValue
+		} else {
+			// Something went wrong, we are only supposed to get valid periods from earlier in the call layer
+			g.log.WithFields(logrus.Fields{
+				"error":    "period value received was not valid",
+				"received": period,
+				"function": "makeGoogleFitRequest",
+			}).Error("Improper period passed in")
+
+			return GoogleValuesResponse{}, errors.New("invalid period value")
+		}
+	}
 
 	aggregateBy := make([]map[string]string, 1)
 	dataSourceMap := make(map[string]string)

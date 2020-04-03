@@ -32,13 +32,13 @@ class SandwichTest < Minitest::Test
             headers: {
                 "User-Agent" => "Sandwich",
                  "Authorization" => "Bearer #{@jwt}",
-                }
-            })
+            }
+        })
 
-            parsed = JSON.parse(response.body)
-            assert_equal 2, parsed["id"]
-            assert_equal 'google', parsed["steps"][0]["platform"]
-            assert_equal 500, parsed["steps"][0]["value"]
+        parsed = JSON.parse(response.body)
+        assert_equal 2, parsed["id"]
+        assert_equal 'google', parsed["steps"][0]["platform"]
+        assert_equal 500, parsed["steps"][0]["value"]
     end
 
     def test_get_calories_google
@@ -46,13 +46,13 @@ class SandwichTest < Minitest::Test
             headers: {
                 "User-Agent" => "Sandwich",
                  "Authorization" => "Bearer #{@jwt}",
-                   }
-            })
+            }
+        })
 
-            parsed = JSON.parse(response.body)
-            assert_equal 2, parsed["id"]
-            assert_equal 'google', parsed["calories"][0]["platform"]
-            assert_equal 1635, parsed["calories"][0]["value"]
+        parsed = JSON.parse(response.body)
+        assert_equal 2, parsed["id"]
+        assert_equal 'google', parsed["calories"][0]["platform"]
+        assert_equal 1635, parsed["calories"][0]["value"]
     end
 
     def test_get_distance_google
@@ -60,98 +60,98 @@ class SandwichTest < Minitest::Test
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
-                }
-            })
+            }
+        })
 
-            parsed = JSON.parse(response.body)
-            assert_equal 2, parsed["id"]
-            assert_equal 'google', parsed["distance"][0]["platform"]
-            assert_equal 3.456, parsed["distance"][0]["value"]
+        parsed = JSON.parse(response.body)
+        assert_equal 2, parsed["id"]
+        assert_equal 'google', parsed["distance"][0]["platform"]
+        assert_equal 3.456, parsed["distance"][0]["value"]
     end
 
     def test_get_distance_strava
-            response = HTTParty.get('http://localhost:8080/user/4/distance?date=2020-02-13', {
-                headers: {
-                    "User-Agent" => "Sandwich",
-                    "Authorization" => "Bearer #{@jwt}",
-                    }
-                })
+        response = HTTParty.get('http://localhost:8080/user/4/distance?date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+            }
+        })
 
-                parsed = JSON.parse(response.body)
-                assert_equal 4, parsed["id"]
-                assert_equal 'strava', parsed["distance"][0]["platform"]
-                assert_equal 1.304, parsed["distance"][0]["value"]
+        parsed = JSON.parse(response.body)
+        assert_equal 4, parsed["id"]
+        assert_equal 'strava', parsed["distance"][0]["platform"]
+        assert_equal 1.304, parsed["distance"][0]["value"]
     end
 
     def test_get_calories_all_platforms
-            response = HTTParty.get('http://localhost:8080/user/3/calories?date=2020-02-13', {
-                headers: {
-                    "User-Agent" => "Sandwich",
-                    "Authorization" => "Bearer #{@jwt}",
-                    }
-                })
+        response = HTTParty.get('http://localhost:8080/user/3/calories?date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+            }
+        })
+        parsed = JSON.parse(response.body)
+        assert_equal 3, parsed["id"]
 
-                parsed = JSON.parse(response.body)
-                assert_equal 3, parsed["id"]
+        # It appears fitbit will come before google in the return object
+        assert_equal 'fitbit', parsed["calories"][0]["platform"]
+        assert_equal 1010, parsed["calories"][0]["value"]
 
-                #it appears fitbit will come before google in the return object
-                assert_equal 'fitbit', parsed["calories"][0]["platform"]
-                assert_equal 1010, parsed["calories"][0]["value"]
+        assert_equal 'google', parsed["calories"][1]["platform"]
+        assert_equal 1635, parsed["calories"][1]["value"]
 
-                assert_equal 'google', parsed["calories"][1]["platform"]
-                assert_equal 1635, parsed["calories"][1]["value"]
-
-                assert_equal 'strava', parsed["calories"][2]["platform"]
-                assert_equal 938, parsed["calories"][2]["value"]
+        assert_equal 'strava', parsed["calories"][2]["platform"]
+        assert_equal 938, parsed["calories"][2]["value"]
     end
 
     def test_get_max_calories
-                response = HTTParty.get('http://localhost:8080/user/3/calories/largest?date=2020-02-13', {
-                    headers: {
-                        "User-Agent" => "Sandwich",
-                        "Authorization" => "Bearer #{@jwt}",
-                        }
-                    })
+        response = HTTParty.get('http://localhost:8080/user/3/calories?largestOnly=true&date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+            }
+        })
 
-                    parsed = JSON.parse(response.body)
-                    assert_equal 3, parsed["id"]
+        parsed = JSON.parse(response.body)
+        assert_equal 3, parsed["id"]
 
-                    # There should only be the google platform returned, because it has more calories than Fitbit
-                    assert_equal 'google', parsed["calories"][0]["platform"]
-                    assert_equal 1635, parsed["calories"][0]["value"]
+        # There should only be the google platform returned, because it has more calories than Fitbit
+        assert_equal 'google', parsed["calories"][0]["platform"]
+        assert_equal 1635, parsed["calories"][0]["value"]
     end
 
     def test_get_max_steps
-                    response = HTTParty.get('http://localhost:8080/user/3/steps/largest?date=2020-02-13', {
-                        headers: {
-                            "User-Agent" => "Sandwich",
-                            "Authorization" => "Bearer #{@jwt}",
-                            }
-                        })
+        response = HTTParty.get('http://localhost:8080/user/3/steps?largestOnly=true&date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+            }
+        })
 
-                        parsed = JSON.parse(response.body)
-                        assert_equal 3, parsed["id"]
+        parsed = JSON.parse(response.body)
+        assert_equal 3, parsed["id"]
 
-                        # The Fitbit platform has more steps than Google, so it should return the Fitbit Amount
-                        assert_equal 'fitbit', parsed["steps"][0]["platform"]
-                        assert_equal 2020, parsed["steps"][0]["value"]
+        # The Fitbit platform has more steps than Google, so it should return the Fitbit Amount
+        assert_equal 'fitbit', parsed["steps"][0]["platform"]
+        assert_equal 2020, parsed["steps"][0]["value"]
     end
 
     def test_get_max_distance
-                        response = HTTParty.get('http://localhost:8080/user/3/distance/largest?date=2020-02-13', {
-                            headers: {
-                                "User-Agent" => "Sandwich",
-                                "Authorization" => "Bearer #{@jwt}",
-                                }
-                            })
+        response = HTTParty.get('http://localhost:8080/user/3/distance?largestOnly=true&date=2020-02-13', {
+            headers: {
+                "User-Agent" => "Sandwich",
+                "Authorization" => "Bearer #{@jwt}",
+            }
+        })
 
-                            parsed = JSON.parse(response.body)
-                            assert_equal 3, parsed["id"]
+        parsed = JSON.parse(response.body)
+        assert_equal 3, parsed["id"]
 
-                            # Google has more distance than fitbit
-                            assert_equal 'google', parsed["distance"][0]["platform"]
-                            assert_equal 3.456, parsed["distance"][0]["value"]
-        end
+        # Google has more distance than fitbit
+        assert_equal 'google', parsed["distance"][0]["platform"]
+        assert_equal 3.456, parsed["distance"][0]["value"]
+    end
+
 
     def test_client_signup_name_already_taken
         response = HTTParty.post(
@@ -243,54 +243,54 @@ class SandwichTest < Minitest::Test
     end
 
     def test_client_update_callback_incorrect_client
-            response = HTTParty.post('http://localhost:8080/client/34/callback', {
-                :multipart => true,
-                :body => {
-                    :callback => 'Sandwich'
-                },
-                :headers => {
-                    'Content-Type' => 'multipart/form-data',
-                    'Origin' => 'https://marathon-18119.firebaseapp.com'
-                }
-            })
-            parsed = JSON.parse(response.body)
+        response = HTTParty.post('http://localhost:8080/client/34/callback', {
+            :multipart => true,
+            :body => {
+                :callback => 'Sandwich'
+            },
+            :headers => {
+                'Content-Type' => 'multipart/form-data',
+                'Origin' => 'https://marathon-18119.firebaseapp.com'
+            }
+        })
+        parsed = JSON.parse(response.body)
 
-            assert_equal false, parsed["success"]
-            assert_equal 'clientID does not match any registered client', parsed["error"]
+        assert_equal false, parsed["success"]
+        assert_equal 'clientID does not match any registered client', parsed["error"]
     end
 
     def test_client_update_callback_non_integer_clientID
-                response = HTTParty.post('http://localhost:8080/client/notaninteger/callback', {
-                    :multipart => true,
-                    :body => {
-                        :callback => 'Sandwich'
-                    },
-                    :headers => {
-                        'Content-Type' => 'multipart/form-data',
-                        'Origin' => 'https://marathon-18119.firebaseapp.com'
-                    }
-                })
-                parsed = JSON.parse(response.body)
+        response = HTTParty.post('http://localhost:8080/client/notaninteger/callback', {
+            :multipart => true,
+            :body => {
+                :callback => 'Sandwich'
+            },
+            :headers => {
+                'Content-Type' => 'multipart/form-data',
+                'Origin' => 'https://marathon-18119.firebaseapp.com'
+            }
+        })
+        parsed = JSON.parse(response.body)
 
-                assert_equal false, parsed["success"]
-                assert_equal 'clientID must be an integer', parsed["error"]
+        assert_equal false, parsed["success"]
+        assert_equal 'clientID must be an integer', parsed["error"]
     end
 
     def test_client_update_callback_correct_call
-                    response = HTTParty.post('http://localhost:8080/client/1/callback', {
-                        :multipart => true,
-                        :body => {
-                            :callback => 'Sandwich_callback'
-                        },
-                        :headers => {
-                            'Content-Type' => 'multipart/form-data',
-                            'Origin' => 'https://marathon-18119.firebaseapp.com'
-                        }
-                    })
-                    parsed = JSON.parse(response.body)
+        response = HTTParty.post('http://localhost:8080/client/1/callback', {
+            :multipart => true,
+            :body => {
+                :callback => 'Sandwich_callback'
+            },
+            :headers => {
+                'Content-Type' => 'multipart/form-data',
+                'Origin' => 'https://marathon-18119.firebaseapp.com'
+            }
+        })
+        parsed = JSON.parse(response.body)
 
-                    assert_equal true, parsed["success"]
-                    assert_equal 'Sandwich_callback', parsed["updatedCallback"]
+        assert_equal true, parsed["success"]
+        assert_equal 'Sandwich_callback', parsed["updatedCallback"]
     end
 
 end

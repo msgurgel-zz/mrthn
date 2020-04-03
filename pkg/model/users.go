@@ -18,9 +18,17 @@ type ValueResult struct {
 	Value    float64 `json:"value"`
 }
 
+type GetValueParams struct {
+	DB          *sql.DB
+	Log         *logrus.Logger
+	UserID      int
+	Date        time.Time
+	LargestOnly bool
+}
+
 // TODO: Can this be refactored, so there isn't as much copied code from GetUserSteps?
-func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
-	platforms, err := getPlatforms(db, userID, log)
+func GetUserCalories(params GetValueParams) ([]ValueResult, error) {
+	platforms, err := getPlatforms(params.DB, params.UserID, params.Log)
 	if err != nil {
 		return nil, err
 	}
@@ -28,12 +36,12 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time,
 	// Request steps from each platform
 	var caloriesValues []ValueResult
 	for _, p := range platforms {
-		result, err := p.GetCalories(userID, date)
+		result, err := p.GetCalories(params.UserID, params.Date)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			params.Log.WithFields(logrus.Fields{
 				"err":    err,
-				"userID": userID,
-				"date":   date.Format(helpers.ISOLayout),
+				"userID": params.UserID,
+				"date":   params.Date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetCalories for platform")
 			continue // Try the next platform
@@ -52,15 +60,15 @@ func GetUserCalories(db *sql.DB, log *logrus.Logger, userID int, date time.Time,
 	}
 
 	// If the user only wants the largest amount, filter out the other results
-	if maxAmount {
+	if params.LargestOnly {
 		return filterNonLargest(caloriesValues), nil
 	}
 
 	return caloriesValues, nil
 }
 
-func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
-	platforms, err := getPlatforms(db, userID, log)
+func GetUserSteps(params GetValueParams) ([]ValueResult, error) {
+	platforms, err := getPlatforms(params.DB, params.UserID, params.Log)
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +76,12 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time, ma
 	// Request steps from each platform
 	var stepsValues []ValueResult
 	for _, p := range platforms {
-		result, err := p.GetSteps(userID, date)
+		result, err := p.GetSteps(params.UserID, params.Date)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			params.Log.WithFields(logrus.Fields{
 				"err":    err,
-				"userID": userID,
-				"date":   date.Format(helpers.ISOLayout),
+				"userID": params.UserID,
+				"date":   params.Date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetSteps for platform")
 			continue // Try the next platform
@@ -92,15 +100,15 @@ func GetUserSteps(db *sql.DB, log *logrus.Logger, userID int, date time.Time, ma
 	}
 
 	// If the user only wants the largest amount, filter out the other results
-	if maxAmount {
+	if params.LargestOnly {
 		return filterNonLargest(stepsValues), nil
 	}
 
 	return stepsValues, nil
 }
 
-func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time, maxAmount bool) ([]ValueResult, error) {
-	platforms, err := getPlatforms(db, userID, log)
+func GetUserDistance(params GetValueParams) ([]ValueResult, error) {
+	platforms, err := getPlatforms(params.DB, params.UserID, params.Log)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +116,12 @@ func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time,
 	// Request steps from each platform
 	var distanceValues []ValueResult
 	for _, p := range platforms {
-		result, err := p.GetDistance(userID, date)
+		result, err := p.GetDistance(params.UserID, params.Date)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			params.Log.WithFields(logrus.Fields{
 				"err":    err,
-				"userID": userID,
-				"date":   date.Format(helpers.ISOLayout),
+				"userID": params.UserID,
+				"date":   params.Date.Format(helpers.ISOLayout),
 				"plat":   p.Name(),
 			}).Error("failed to call GetDistance for platform")
 			continue // Try the next platform
@@ -132,7 +140,47 @@ func GetUserDistance(db *sql.DB, log *logrus.Logger, userID int, date time.Time,
 	}
 
 	// If the user only wants the largest amount, filter out the other results
-	if maxAmount {
+	if params.LargestOnly {
+		return filterNonLargest(distanceValues), nil
+	}
+
+	return distanceValues, nil
+}
+
+func GetUserDistanceOverPeriod(params GetValueParams, period string) ([]ValueResult, error) {
+	platforms, err := getPlatforms(params.DB, params.UserID, params.Log)
+	if err != nil {
+		return nil, err
+	}
+
+	// Request steps from each platform
+	var distanceValues []ValueResult
+	for _, p := range platforms {
+		result, err := p.GetDistanceOverPeriod(params.UserID, params.Date, period)
+		if err != nil {
+			params.Log.WithFields(logrus.Fields{
+				"err":    err,
+				"userID": params.UserID,
+				"date":   params.Date.Format(helpers.ISOLayout),
+				"plat":   p.Name(),
+			}).Error("failed to call GetDistanceOverPeriod for platform")
+			continue // Try the next platform
+		}
+
+		// Format result and add to distanceValues
+		distanceVal := ValueResult{
+			Platform: p.Name(),
+			Value:    result,
+		}
+		distanceValues = append(distanceValues, distanceVal)
+	}
+
+	if len(distanceValues) == 0 {
+		return nil, errors.New("could not connect to any platforms, try again later")
+	}
+
+	// If the user only wants the largest amount, filter out the other results
+	if params.LargestOnly {
 		return filterNonLargest(distanceValues), nil
 	}
 
@@ -155,7 +203,6 @@ func getPlatforms(db *sql.DB, userID int, log *logrus.Logger) ([]platform.Platfo
 }
 
 func filterNonLargest(resultValues []ValueResult) []ValueResult {
-
 	if len(resultValues) <= 1 {
 		return resultValues
 	}
