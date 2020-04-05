@@ -23,6 +23,22 @@ module TestServer
                                 }
                             end
                         end
+
+                        resource :distance do
+                            resource :date do
+                                resource :"2020-02-13" do
+                                    get :"1m.json" do
+                                        {
+                                            "activities-distance":[
+                                                {"dateTime":"2011-04-27","value":"1.0"},
+                                                {"dateTime":"2011-04-28","value":"2.0"},
+                                                {"dateTime":"2011-04-29","value":"3.0"},
+                                            ]
+                                        }
+                                    end
+                                end
+                            end
+                        end
                     end
                 end
            end

@@ -29,10 +29,28 @@ import (
 	"github.com/msgurgel/marathon/pkg/platform"
 )
 
+type verifiedParams struct {
+	userID      int
+	date        time.Time
+	period      string
+	largestOnly bool
+}
+
+type getValueOverPeriodFunc func(params model.GetValueParams, period string) ([]model.ValueResult, error)
+
 type Api struct {
 	log         *logrus.Logger
 	authMethods auth.Types
 	db          *sql.DB
+}
+
+var allowedPeriods = []string{"1d", "7d", "30d", "1w", "1m", "3m", "6m"}
+
+// paramsMapRegular is used for most calls to the Marathon API
+var paramsMapRegular = map[string]bool{
+	"userID":      true,
+	"date":        true,
+	"largestOnly": false,
 }
 
 func NewApi(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Api {
@@ -102,25 +120,42 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (api *Api) GetUserCalories(w http.ResponseWriter, r *http.Request) {
-	api.getCalories(w, r, false)
-}
-
-func (api *Api) GetLargestUserCalories(w http.ResponseWriter, r *http.Request) {
-	api.getCalories(w, r, true)
-}
-
-func (api *Api) getCalories(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
-	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserCalories"})
+func (api *Api) GetCalories(w http.ResponseWriter, r *http.Request) {
+	requestParams, err := api.getRequestParams(r, logrus.Fields{"func": "GetCalories"}, paramsMapRegular)
 	if err != nil {
-		api.respondWithError(w, http.StatusBadRequest, err.Error())
-	}
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to get request parameters")
 
-	if !api.clientCanQueryUser(w, r, userID) {
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	caloriesValues, err := model.GetUserCalories(api.db, api.log, userID, date, onlyReturnLargestValue)
+	// Verify the parameters we got from the request
+	verifiedParams, err := verifyParameters(requestParams)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("request params were invalid")
+
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Check if the client has access to this user
+	if !api.clientCanQueryUser(w, r, verifiedParams.userID) {
+		return
+	}
+
+	// Now that the parameters have been parsed, we can call the API method
+	params := model.GetValueParams{
+		DB:          api.db,
+		Log:         api.log,
+		UserID:      verifiedParams.userID,
+		Date:        verifiedParams.date,
+		LargestOnly: verifiedParams.largestOnly,
+	}
+	caloriesValues, err := model.GetUserCalories(params)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -128,31 +163,48 @@ func (api *Api) getCalories(w http.ResponseWriter, r *http.Request, onlyReturnLa
 	}
 
 	response := GetUserCaloriesResponse{
-		ID:       userID,
+		ID:       verifiedParams.userID,
 		Calories: caloriesValues,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
 }
 
-func (api *Api) GetUserDistance(w http.ResponseWriter, r *http.Request) {
-	api.getDistance(w, r, false)
-}
-
-func (api *Api) GetLargestDistance(w http.ResponseWriter, r *http.Request) {
-	api.getDistance(w, r, true)
-}
-
-func (api *Api) getDistance(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
-	userID, date, err := api.getRequestParams(r, logrus.Fields{"func": "GetUserDistance"})
+func (api *Api) GetDistance(w http.ResponseWriter, r *http.Request) {
+	requestParams, err := api.getRequestParams(r, logrus.Fields{"func": "GetDistance"}, paramsMapRegular)
 	if err != nil {
-		api.respondWithError(w, http.StatusBadRequest, err.Error())
-	}
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to get request parameters")
 
-	if !api.clientCanQueryUser(w, r, userID) {
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	distanceValues, err := model.GetUserDistance(api.db, api.log, userID, date, onlyReturnLargestValue)
+	// Verify the parameters we got from the request
+	verifiedParams, err := verifyParameters(requestParams)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("request params were invalid")
+
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Check if the client has access to this user
+	if !api.clientCanQueryUser(w, r, verifiedParams.userID) {
+		return
+	}
+
+	// No errors when verifying the parameters, make the request to the API
+	params := model.GetValueParams{
+		DB:          api.db,
+		Log:         api.log,
+		UserID:      verifiedParams.userID,
+		Date:        verifiedParams.date,
+		LargestOnly: verifiedParams.largestOnly,
+	}
+	distanceValues, err := model.GetUserDistance(params)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -160,32 +212,48 @@ func (api *Api) getDistance(w http.ResponseWriter, r *http.Request, onlyReturnLa
 	}
 
 	response := GetUserDistanceResponse{
-		ID:       userID,
+		ID:       verifiedParams.userID,
 		Distance: distanceValues,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
 }
 
-func (api *Api) GetUserSteps(w http.ResponseWriter, r *http.Request) {
-	api.getSteps(w, r, false)
-}
-
-func (api *Api) GetLargestSteps(w http.ResponseWriter, r *http.Request) {
-	api.getSteps(w, r, true)
-}
-
-func (api *Api) getSteps(w http.ResponseWriter, r *http.Request, onlyReturnLargestValue bool) {
-	userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
+func (api *Api) GetSteps(w http.ResponseWriter, r *http.Request) {
+	//userID, date, err := api.getRequestParams(r, logrus.Fields{"func:": "GetUserSteps"})
+	requestParams, err := api.getRequestParams(r, logrus.Fields{"func": "getSteps"}, paramsMapRegular)
 	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to get request parameters")
+
 		api.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if !api.clientCanQueryUser(w, r, userID) {
+	// Verify the parameters we got from the request
+	verifiedParams, err := verifyParameters(requestParams)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("request params were invalid")
+
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	stepsValues, err := model.GetUserSteps(api.db, api.log, userID, date, onlyReturnLargestValue)
+	// Check if the client has access to this user
+	if !api.clientCanQueryUser(w, r, verifiedParams.userID) {
+		return
+	}
+
+	params := model.GetValueParams{
+		DB:          api.db,
+		Log:         api.log,
+		UserID:      verifiedParams.userID,
+		Date:        verifiedParams.date,
+		LargestOnly: verifiedParams.largestOnly,
+	}
+	stepsValues, err := model.GetUserSteps(params)
 	if err != nil {
 		// TODO: Change this to a more fitting HTTP code
 		api.respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -193,7 +261,7 @@ func (api *Api) getSteps(w http.ResponseWriter, r *http.Request, onlyReturnLarge
 	}
 
 	response := GetUserStepsResponse{
-		ID:    userID,
+		ID:    verifiedParams.userID,
 		Steps: stepsValues,
 	}
 	api.respondWithJSON(w, http.StatusOK, response)
@@ -768,6 +836,30 @@ func (api *Api) UpdateClientCallback(w http.ResponseWriter, r *http.Request) {
 	api.respondWithJSON(w, http.StatusOK, response)
 }
 
+func (api *Api) GetValueOverPeriod(w http.ResponseWriter, r *http.Request) {
+	// First, check what kind of resource they are asking for
+	vars := mux.Vars(r)
+	pathVariable := vars["resource"]
+
+	if pathVariable == "" {
+		api.respondWithError(w, http.StatusBadRequest,
+			"'resource' field missing in url")
+		return
+	}
+
+	switch pathVariable {
+	case "distance":
+		api.getValueOverPeriod(w, r, model.GetUserDistanceOverPeriod)
+	case "steps":
+		api.respondWithJSON(w, http.StatusInternalServerError, "Steps over period not yet implemented!")
+	case "calories":
+		api.respondWithJSON(w, http.StatusInternalServerError, "Calories over period not yet implemented!")
+	default:
+		api.respondWithError(w, http.StatusBadRequest,
+			fmt.Sprintf("'resource' field must be a proper resource, received:'%s'", pathVariable))
+	}
+}
+
 // Private Functions
 
 func (api *Api) sendAuthorizationResult(w http.ResponseWriter, r *http.Request, userId int, Callback string) {
@@ -790,29 +882,99 @@ func (api *Api) sendFailedAuthorizationResult(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, Callback, http.StatusInternalServerError)
 }
 
-func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields) (userID int, date time.Time, err error) {
-	// Get user from URL
+func (api *Api) getRequestParams(r *http.Request, fields logrus.Fields, params map[string]bool) (resultMap map[string]string, err error) {
+	result := make(map[string]string)
+
 	vars := mux.Vars(r)
-	userID, _ = strconv.Atoi(vars["userID"]) // TODO: deal with error
 
-	// Get date from query params
-	dateStr, ok := r.URL.Query()["date"]
-	if !ok || len(dateStr) != 1 {
-		api.log.WithFields(fields).Error("missing URL param 'date'")
+	for key, boolValue := range params {
 
-		return 0, time.Time{}, errors.New("expected single 'date' parameter")
+		currentParam, ok := r.URL.Query()[key]
+
+		if !ok || len(currentParam) != 1 {
+
+			// Check if it's passed in the path portion
+			pathVariable := vars[key]
+
+			if pathVariable == "" {
+
+				// This parameter is missing.
+				// Check if it's a mandatory one
+
+				if boolValue {
+					api.log.WithFields(fields).Error(fmt.Sprintf("missing mandatory URL parameter '%s'", key))
+
+					return result, errors.New(fmt.Sprintf("missing mandatory parameter '%s'", key))
+				}
+
+				// If it's not mandatory, we can just continue
+				continue
+			}
+
+			result[key] = pathVariable
+
+		} else {
+			// Add the result to the return map
+			result[key] = currentParam[0]
+		}
 	}
 
-	date, err = helpers.ParseISODate(dateStr[0])
+	// Return the Final result
+
+	return result, nil
+}
+
+func (api *Api) getValueOverPeriod(w http.ResponseWriter, r *http.Request, periodFunc getValueOverPeriodFunc) {
+	// Set expected parameters
+	expectedParams := paramsMapRegular
+	expectedParams["period"] = true
+
+	requestParams, err := api.getRequestParams(r, logrus.Fields{"func": "getValueOverPeriod"}, expectedParams)
 	if err != nil {
-		fields["dateStr"] = dateStr
-		fields["err"] = err
-		api.log.WithFields(fields).Error("failed to parse date")
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("failed to get request parameters")
 
-		return 0, time.Time{}, errors.New("invalid date")
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
-	return userID, date, err
+	// Verify the parameters we got from the request
+	verifiedParams, err := verifyParameters(requestParams)
+	if err != nil {
+		api.log.WithFields(logrus.Fields{
+			"err": err,
+		}).Error("request params were invalid")
+
+		api.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Check if the client has access to this user
+	if !api.clientCanQueryUser(w, r, verifiedParams.userID) {
+		return
+	}
+
+	params := model.GetValueParams{
+		DB:          api.db,
+		Log:         api.log,
+		UserID:      verifiedParams.userID,
+		Date:        verifiedParams.date,
+		LargestOnly: verifiedParams.largestOnly,
+	}
+
+	values, err := periodFunc(params, verifiedParams.period)
+	if err != nil {
+		// TODO: Change this to a more fitting HTTP code
+		api.respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := GetValueResponse{
+		ID:     verifiedParams.userID,
+		Result: values,
+	}
+	api.respondWithJSON(w, http.StatusOK, response)
 }
 
 func (api *Api) clientHasAccessToUser(w http.ResponseWriter, clientID, userID int) bool {
@@ -995,4 +1157,61 @@ func checkMarathonURL(log *logrus.Logger, next http.Handler, allowedOrigin strin
 		// Call was made from Marathon Website, call the next middleware
 		next.ServeHTTP(w, r)
 	})
+}
+
+func verifyParameters(obtainedParams map[string]string) (verifiedParams, error) {
+	result := verifiedParams{}
+
+	// Verify the userID
+	userID, err := strconv.Atoi(obtainedParams["userID"])
+	if err != nil {
+		return verifiedParams{}, errors.New("'userID' parameter must be an integer")
+	}
+	result.userID = userID
+
+	// Verify the date
+	date, err := helpers.ParseISODate(obtainedParams["date"])
+	if err != nil {
+		return verifiedParams{}, errors.New("'date' parameter was invalid")
+	}
+	result.date = date
+
+	// If the period is passed in, check if it's acceptable
+	if period, ok := obtainedParams["period"]; ok {
+		var periodIsAcceptable = false
+		for _, periodValue := range allowedPeriods {
+			if period == periodValue {
+				// Add it to the result struct
+				periodIsAcceptable = true
+				result.period = period
+				break
+			}
+		}
+		if !periodIsAcceptable {
+			// We went through the list but none of the values matched the period entered
+			return verifiedParams{}, errors.New(fmt.Sprintf("'period' parameter must be an acceptable period value, received '%s'", period))
+		}
+	} else {
+		// The period wasn't set in the params
+		result.period = ""
+	}
+
+	// Verify if largestOnly was passed in as a correct value
+	if largestOnly, ok := obtainedParams["largestOnly"]; ok {
+		// Check if the user entered a correct value
+		if largestOnly == "true" {
+			result.largestOnly = true
+		} else if largestOnly == "false" {
+			result.largestOnly = false
+		} else {
+			// Invalid value
+			return verifiedParams{}, errors.New(fmt.Sprintf("'largestOnly' parameter must either be 'true' or 'false', received '%s'", largestOnly))
+		}
+
+	} else {
+		// LargestOnly wasn't present in the params
+		result.largestOnly = false
+	}
+
+	return result, nil
 }

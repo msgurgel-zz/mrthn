@@ -26,6 +26,11 @@ type GetUserDistanceResponse struct {
 	Distance []model.ValueResult `json:"distance,omitempty"`
 }
 
+type GetValueResponse struct {
+	ID     int                 `json:"id,omitempty"`
+	Result []model.ValueResult `json:"result,omitempty"`
+}
+
 type ClientSignUpResponse struct {
 	Success    bool   `json:"success"`
 	ClientID   int    `json:"clientID"`
