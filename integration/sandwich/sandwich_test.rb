@@ -162,7 +162,7 @@ class SandwichTest < Minitest::Test
                 password: 'whatever'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -179,7 +179,7 @@ class SandwichTest < Minitest::Test
                 password: 'whatever'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -196,7 +196,7 @@ class SandwichTest < Minitest::Test
                 name: 'no_password_client',
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -214,7 +214,7 @@ class SandwichTest < Minitest::Test
                 password: 'pass12345'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
 
@@ -233,7 +233,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -250,7 +250,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -267,7 +267,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -284,7 +284,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)

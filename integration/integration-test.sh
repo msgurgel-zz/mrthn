@@ -25,7 +25,7 @@ MARATHON_PID=$!
 sleep 1 # Give the server time to start
 
 # Generate JWT for authentication
-curl -s "http://localhost:8080/get-token?id=1" -H "Origin: https://marathon-18119.firebaseapp.com"> token.txt
+curl -s "http://localhost:8080/get-token?id=1" -H "Origin: https://mrthn.dev"> token.txt
 
 # Run mock third-party server
 rackup integration/sandwich/server/config.ru > log/test-server.log 2>&1 &

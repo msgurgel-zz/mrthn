@@ -123,7 +123,6 @@ func (api *Api) GetToken(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) GetValueDaily(w http.ResponseWriter, r *http.Request) {
 	// First, check what kind of resource they are asking for
-	api.log.Debug("hit the endpoint")
 	vars := mux.Vars(r)
 	pathVariable := vars["resource"]
 
