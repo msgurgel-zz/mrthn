@@ -14,7 +14,7 @@ class SandwichTest < Minitest::Test
     end
 
     def test_get_steps_fitbit
-        response = HTTParty.get('http://localhost:8080/user/1/steps?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/1/steps/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -23,12 +23,12 @@ class SandwichTest < Minitest::Test
 
         parsed = JSON.parse(response.body)
         assert_equal 1, parsed["id"]
-        assert_equal 'fitbit', parsed["steps"][0]["platform"]
-        assert_equal 2020, parsed["steps"][0]["value"]
+        assert_equal 'fitbit', parsed["result"][0]["platform"]
+        assert_equal 2020, parsed["result"][0]["value"]
     end
 
     def test_get_steps_google
-        response = HTTParty.get('http://localhost:8080/user/2/steps?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/2/steps/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                  "Authorization" => "Bearer #{@jwt}",
@@ -37,12 +37,12 @@ class SandwichTest < Minitest::Test
 
         parsed = JSON.parse(response.body)
         assert_equal 2, parsed["id"]
-        assert_equal 'google', parsed["steps"][0]["platform"]
-        assert_equal 500, parsed["steps"][0]["value"]
+        assert_equal 'google', parsed["result"][0]["platform"]
+        assert_equal 500, parsed["result"][0]["value"]
     end
 
     def test_get_calories_google
-        response = HTTParty.get('http://localhost:8080/user/2/calories?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/2/calories/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                  "Authorization" => "Bearer #{@jwt}",
@@ -51,12 +51,12 @@ class SandwichTest < Minitest::Test
 
         parsed = JSON.parse(response.body)
         assert_equal 2, parsed["id"]
-        assert_equal 'google', parsed["calories"][0]["platform"]
-        assert_equal 1635, parsed["calories"][0]["value"]
+        assert_equal 'google', parsed["result"][0]["platform"]
+        assert_equal 1635, parsed["result"][0]["value"]
     end
 
     def test_get_distance_google
-        response = HTTParty.get('http://localhost:8080/user/2/distance?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/2/distance/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -65,12 +65,12 @@ class SandwichTest < Minitest::Test
 
         parsed = JSON.parse(response.body)
         assert_equal 2, parsed["id"]
-        assert_equal 'google', parsed["distance"][0]["platform"]
-        assert_equal 3.456, parsed["distance"][0]["value"]
+        assert_equal 'google', parsed["result"][0]["platform"]
+        assert_equal 3.456, parsed["result"][0]["value"]
     end
 
     def test_get_distance_strava
-        response = HTTParty.get('http://localhost:8080/user/4/distance?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/4/distance/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -79,12 +79,12 @@ class SandwichTest < Minitest::Test
 
         parsed = JSON.parse(response.body)
         assert_equal 4, parsed["id"]
-        assert_equal 'strava', parsed["distance"][0]["platform"]
-        assert_equal 1.304, parsed["distance"][0]["value"]
+        assert_equal 'strava', parsed["result"][0]["platform"]
+        assert_equal 1.304, parsed["result"][0]["value"]
     end
 
     def test_get_calories_all_platforms
-        response = HTTParty.get('http://localhost:8080/user/3/calories?date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/3/calories/daily?date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -94,18 +94,18 @@ class SandwichTest < Minitest::Test
         assert_equal 3, parsed["id"]
 
         # It appears fitbit will come before google in the return object
-        assert_equal 'fitbit', parsed["calories"][0]["platform"]
-        assert_equal 1010, parsed["calories"][0]["value"]
+        assert_equal 'fitbit', parsed["result"][0]["platform"]
+        assert_equal 1010, parsed["result"][0]["value"]
 
-        assert_equal 'google', parsed["calories"][1]["platform"]
-        assert_equal 1635, parsed["calories"][1]["value"]
+        assert_equal 'google', parsed["result"][1]["platform"]
+        assert_equal 1635, parsed["result"][1]["value"]
 
-        assert_equal 'strava', parsed["calories"][2]["platform"]
-        assert_equal 938, parsed["calories"][2]["value"]
+        assert_equal 'strava', parsed["result"][2]["platform"]
+        assert_equal 938, parsed["result"][2]["value"]
     end
 
     def test_get_max_calories
-        response = HTTParty.get('http://localhost:8080/user/3/calories?largestOnly=true&date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/3/calories/daily?largestOnly=true&date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -116,12 +116,12 @@ class SandwichTest < Minitest::Test
         assert_equal 3, parsed["id"]
 
         # There should only be the google platform returned, because it has more calories than Fitbit
-        assert_equal 'google', parsed["calories"][0]["platform"]
-        assert_equal 1635, parsed["calories"][0]["value"]
+        assert_equal 'google', parsed["result"][0]["platform"]
+        assert_equal 1635, parsed["result"][0]["value"]
     end
 
     def test_get_max_steps
-        response = HTTParty.get('http://localhost:8080/user/3/steps?largestOnly=true&date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/3/steps/daily?largestOnly=true&date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -132,12 +132,12 @@ class SandwichTest < Minitest::Test
         assert_equal 3, parsed["id"]
 
         # The Fitbit platform has more steps than Google, so it should return the Fitbit Amount
-        assert_equal 'fitbit', parsed["steps"][0]["platform"]
-        assert_equal 2020, parsed["steps"][0]["value"]
+        assert_equal 'fitbit', parsed["result"][0]["platform"]
+        assert_equal 2020, parsed["result"][0]["value"]
     end
 
     def test_get_max_distance
-        response = HTTParty.get('http://localhost:8080/user/3/distance?largestOnly=true&date=2020-02-13', {
+        response = HTTParty.get('http://localhost:8080/user/3/distance/daily?largestOnly=true&date=2020-02-13', {
             headers: {
                 "User-Agent" => "Sandwich",
                 "Authorization" => "Bearer #{@jwt}",
@@ -148,8 +148,8 @@ class SandwichTest < Minitest::Test
         assert_equal 3, parsed["id"]
 
         # Google has more distance than fitbit
-        assert_equal 'google', parsed["distance"][0]["platform"]
-        assert_equal 3.456, parsed["distance"][0]["value"]
+        assert_equal 'google', parsed["result"][0]["platform"]
+        assert_equal 3.456, parsed["result"][0]["value"]
     end
 
 
@@ -162,7 +162,7 @@ class SandwichTest < Minitest::Test
                 password: 'whatever'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -179,7 +179,7 @@ class SandwichTest < Minitest::Test
                 password: 'whatever'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -196,7 +196,7 @@ class SandwichTest < Minitest::Test
                 name: 'no_password_client',
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
         parsed = JSON.parse(response.body)
@@ -214,7 +214,7 @@ class SandwichTest < Minitest::Test
                 password: 'pass12345'
             },
             headers: {
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         )
 
@@ -233,7 +233,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -250,7 +250,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -267,7 +267,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -284,7 +284,7 @@ class SandwichTest < Minitest::Test
             },
             :headers => {
                 'Content-Type' => 'multipart/form-data',
-                'Origin' => 'https://marathon-18119.firebaseapp.com'
+                'Origin' => 'https://mrthn.dev'
             }
         })
         parsed = JSON.parse(response.body)
@@ -292,5 +292,4 @@ class SandwichTest < Minitest::Test
         assert_equal true, parsed["success"]
         assert_equal 'Sandwich_callback', parsed["updatedCallback"]
     end
-
 end
