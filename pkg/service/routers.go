@@ -88,30 +88,12 @@ func prepareRoutes(db *sql.DB, logger *logrus.Logger, authTypes auth.Types) Rout
 		},
 
 		Route{
-			"GetUserCalories",
+			"GetValueDaily",
 			"GET",
-			"/user/{userID}/calories",
+			"/user/{userID}/{resource}/daily",
 			true,
 			false,
-			api.GetCalories,
-		},
-
-		Route{
-			"GetUserSteps",
-			"GET",
-			"/user/{userID}/steps",
-			true,
-			false,
-			api.GetSteps,
-		},
-
-		Route{
-			"GetDistance",
-			"GET",
-			"/user/{userID}/distance",
-			true,
-			false,
-			api.GetDistance,
+			api.GetValueDaily,
 		},
 
 		Route{

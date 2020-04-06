@@ -11,21 +11,6 @@ import (
 	"github.com/msgurgel/marathon/pkg/model"
 )
 
-type GetUserStepsResponse struct {
-	ID    int                 `json:"id,omitempty"`
-	Steps []model.ValueResult `json:"steps,omitempty"`
-}
-
-type GetUserCaloriesResponse struct {
-	ID       int                 `json:"id,omitempty"`
-	Calories []model.ValueResult `json:"calories,omitempty"`
-}
-
-type GetUserDistanceResponse struct {
-	ID       int                 `json:"id,omitempty"`
-	Distance []model.ValueResult `json:"distance,omitempty"`
-}
-
 type GetValueResponse struct {
 	ID     int                 `json:"id,omitempty"`
 	Result []model.ValueResult `json:"result,omitempty"`
