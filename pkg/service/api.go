@@ -1053,6 +1053,11 @@ func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interfa
 		api.log.WithFields(logrus.Fields{
 			"err": err,
 		}).Error("failed to send response to client")
+	} else {
+		api.log.WithFields(logrus.Fields{
+			"payload": payload,
+			"code":    code,
+		}).Info("sent response to caller")
 	}
 
 	return err
