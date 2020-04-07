@@ -35,6 +35,16 @@ CREATE INDEX credentials_upid_index ON credentials(upid);
 INSERT INTO client (name, password, callback)
 VALUES ('Passive Marathon', 'bad_hash', 'test_callback');
 
+CREATE TABLE user_data(
+    id                SERIAL      PRIMARY KEY,
+    user_id           INTEGER     REFERENCES "user"(id),
+    platform_id       INTEGER     REFERENCES platform(id),
+    date              DATE        NOT NULL,
+    steps             INTEGER     NOT NULL,
+    calories          INTEGER     NOT NULL,
+    distance          FLOAT       NOT NULL,
+);
+
 INSERT INTO platform (name, domain) VALUES ('google', 'https://www.googleapis.com/fitness/v1');
 INSERT INTO platform (name, domain) VALUES ('fitbit', 'https://api.fitbit.com/1');
 INSERT INTO platform (name, domain) VALUES ('strava', 'https://www.strava.com/api/v3');
