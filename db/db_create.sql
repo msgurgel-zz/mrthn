@@ -42,7 +42,7 @@ CREATE TABLE user_data(
     date              DATE        NOT NULL,
     steps             INTEGER     NOT NULL,
     calories          INTEGER     NOT NULL,
-    distance          FLOAT       NOT NULL,
+    distance          FLOAT       NOT NULL
 );
 
 INSERT INTO platform (name, domain) VALUES ('google', 'https://www.googleapis.com/fitness/v1');
