@@ -37,9 +37,7 @@ AS $$
 DECLARE
 
 BEGIN
-    CALL InsertUserData(userID, 1, insertDate);
-    CALL InsertUserData(userID, 2, insertDate);
-    CALL InsertUserData(userID, 3, insertDate);
+    CALL InsertUserData(userID, random_between(1,3), insertDate);
 END
 $$;
 
