@@ -1,8 +1,6 @@
 SET SEARCH_PATH = "public";
 
-
-
-CREATE OR REPLACE FUNCTION random_between(low INT ,high INT)
+CREATE OR REPLACE FUNCTION random_between(low INT, high INT)
    RETURNS INT AS
 $$
 BEGIN
@@ -10,13 +8,10 @@ BEGIN
 END;
 $$ language 'plpgsql' STRICT;
 
-
-
 CREATE OR REPLACE PROCEDURE InsertUserData(userID BIGINT, platformID INTEGER, insertDate DATE)
 LANGUAGE 'plpgsql'
 AS $$
 DECLARE
-
     -- Max and Min values for calories, steps and distance
     MAX_CALORIES INTEGER := 3000;
     MIN_CALORIES INTEGER := 1500;
@@ -36,7 +31,6 @@ BEGIN
 END
 $$;
 
-
 CREATE OR REPLACE PROCEDURE GenerateUserData(userID BIGINT, insertDate DATE)
 LANGUAGE 'plpgsql'
 AS $$
@@ -49,8 +43,7 @@ BEGIN
 END
 $$;
 
-
--- The actual stored procedure that will generate a months worth of Data
+-- The actual stored procedure that will generate a month's worth of Data
 CREATE OR REPLACE PROCEDURE GenerateData()
 LANGUAGE 'plpgsql'
 AS $$
@@ -80,8 +73,6 @@ BEGIN
 
             counter := counter + 1;
             startDate := startDate + 1;
-
-
         END LOOP;
 
         currentUsers := currentUsers + 1;
