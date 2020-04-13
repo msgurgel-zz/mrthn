@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/msgurgel/marathon/pkg/scheduled"
+
 	"github.com/msgurgel/marathon/pkg/platform"
 
 	"github.com/sirupsen/logrus"
@@ -24,6 +26,7 @@ import (
 	"github.com/msgurgel/marathon/pkg/dal"
 	"github.com/msgurgel/marathon/pkg/environment"
 	"github.com/msgurgel/marathon/pkg/service"
+	"github.com/robfig/cron"
 )
 
 func main() {
@@ -102,6 +105,31 @@ func main() {
 		"port": env.Server.Port,
 	}).Info("Server started")
 
+	// Every night, at 11:00 PM, the server should attempt to update the user data of users signed in with credentials
+	scheduledTask := cron.New()
+	//err = scheduledTask.AddFunc("0 23 * * ?", func() {
+	err = scheduledTask.AddFunc("@every 1m", func() {
+
+		log.WithFields(logrus.Fields{
+			"time": time.Now(),
+		}).Info("starting user data update task")
+
+		err := scheduled.UpdateUserData(db, log)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"time": time.Now(),
+			}).Error("error occurred while attempting to update user data")
+		}
+	})
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Error("error occurred while attempting schedule daily task")
+	}
+
+	scheduledTask.Start()
+
 	c := make(chan os.Signal, 1)
 
 	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C) or SIGTERM (Ctrl+/)
@@ -114,6 +142,9 @@ func main() {
 	// Create a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
+
+	// Tell the scheduled tasks to stop running
+	scheduledTask.Stop()
 
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.

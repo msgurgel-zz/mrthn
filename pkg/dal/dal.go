@@ -17,6 +17,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type UserData struct {
+	Platforms map[string]map[string]float64
+	UserID    int
+	Date      time.Time
+}
+
+//type UserDataPlatform struct {
+//	Values map[string]float64
+//}
+
 type Connection struct {
 	ConnectionType string
 	Parameters     map[string]string
@@ -478,4 +488,78 @@ func parseConnectionString(connectionString string) (Connection, error) {
 		// This is not a supported Connection type, bad data in the database
 		return returnedConnection, errors.New("Connection type '" + connectionParams[0] + "' unsupported")
 	}
+}
+
+func GetAllUserIdsInCredentials(db *sql.DB) ([]int, error) {
+	userIdQuery := "SELECT user_id FROM credentials"
+
+	rows, err := db.Query(userIdQuery)
+
+	if err != nil {
+		return []int{}, err
+	}
+
+	defer rows.Close()
+
+	var currentUserID int
+	var results []int
+
+	for rows.Next() {
+		err := rows.Scan(&currentUserID)
+		if err != nil {
+			return results, err
+		}
+
+		results = append(results, currentUserID)
+	}
+
+	return results, nil
+
+}
+
+func AddUserData(db *sql.DB, data UserData) (bool, error) {
+
+	// We need to add every platform result to the database
+	for key, currentPlatform := range data.Platforms {
+
+		var platformID int
+
+		platIDQuery := fmt.Sprintf("SELECT id FROM platform WHERE name = '%s'", key)
+		err := db.QueryRow(platIDQuery).Scan(&platformID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return false, errors.New("attempted to insert into a platform that doesn't exist: " + key)
+			}
+
+		}
+
+		// Fetch the actual data we are going to insert into the user_data table
+		calories := 0
+		steps := 0
+		distance := 0.0
+
+		if val, ok := currentPlatform["calories"]; ok {
+			calories = int(val)
+		}
+
+		if val, ok := currentPlatform["steps"]; ok {
+			steps = int(val)
+		}
+
+		if val, ok := currentPlatform["distance"]; ok {
+			distance = val
+		}
+
+		dateString, _ := time.Parse("2006-01-02", data.Date.String())
+
+		insertQuery := fmt.Sprintf("INSERT INTO user_data (user_id, platform_id,date, steps, calories, distance) VALUES (%d,%d,'%s',%d, %d,%f)",
+			data.UserID, platformID, dateString, steps, calories, distance)
+
+		_, err = db.Exec(insertQuery)
+		if err != nil {
+			return false, err
+		}
+
+	}
+	return true, nil
 }
