@@ -174,13 +174,20 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	UnixTimeDateInt := date.UnixNano() / 1000000
 
 	var UnixTimeLimit int64
+
+	// If the user only entered the date, just add the amount of milliseconds in a day to the time limit
+	var bucketByTime = make(map[string]int64)
+
 	// If the user only entered the date, just add the amount of milliseconds in a day to the time limit
 	if period == "" {
 		UnixTimeLimit = UnixTimeDateInt + millisecondsInADay
+		bucketByTime["durationMillis"] = millisecondsInADay
 	} else {
 		// Get the appropriate amount of milliseconds from the map
 		if millisecondValue, ok := periodToMilliseconds[period]; ok {
 			UnixTimeLimit = UnixTimeDateInt + millisecondValue
+
+			bucketByTime["durationMillis"] = millisecondValue
 		} else {
 			// Something went wrong, we are only supposed to get valid periods from earlier in the call layer
 			g.log.WithFields(logrus.Fields{
@@ -197,10 +204,6 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	dataSourceMap := make(map[string]string)
 	dataSourceMap["dataSourceId"] = dataSourceID
 	aggregateBy[0] = dataSourceMap
-
-	var bucketByTime = make(map[string]int64)
-
-	bucketByTime["durationMillis"] = millisecondsInADay
 
 	// Need to create the request body
 	requestBody, err := json.Marshal(GoogleFitRequest{
