@@ -854,7 +854,14 @@ func (api *Api) getValueDaily(w http.ResponseWriter, r *http.Request, dailyFunc 
 
 func (api *Api) getValueOverPeriod(w http.ResponseWriter, r *http.Request, periodFunc getValueOverPeriodFunc) {
 	// Set expected parameters
-	expectedParams := paramsMapRegular
+	// Maps are a reference type in Go. Simply doing 'expectedParams := paramsMapRegular' led to a bug where the original map was updated
+
+	expectedParams := make(map[string]bool)
+
+	for key, value := range paramsMapRegular {
+		expectedParams[key] = value
+	}
+
 	expectedParams["period"] = true
 
 	requestParams, err := api.getRequestParams(r, logrus.Fields{"func": "getValueOverPeriod"}, expectedParams)
