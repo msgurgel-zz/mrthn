@@ -88,13 +88,8 @@ func (g Google) GetSteps(userID int, date time.Time) (int, error) {
 		return 0, err
 	}
 
-	//if response == nil {
-	//	return 0, nil
-	//}
-
-	//intValue := response[0]["intVal"]
 	// Google gives the value back as a float, but it can be parsed as an int
-	//return int(intValue.(float64)), nil
+
 	return int(response), nil
 }
 
@@ -104,12 +99,6 @@ func (g Google) GetCalories(userID int, date time.Time) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	// Get the value from the response
-	//if response == nil {
-	//	return 0, nil
-	//}
-
-	//intValue := response[0]["fpVal"]
 
 	return int(response), nil
 }
@@ -120,16 +109,11 @@ func (g Google) GetDistance(userID int, date time.Time) (float64, error) {
 		return 0, err
 	}
 
-	//if response == nil {
-	//	return 0, nil
-	//}
-
 	// To prevent dividing by 0
 	if response == 0 {
 		return 0, nil
 	}
 
-	//floatValue := response[0]["fpVal"]
 	// Divide the result by 1000, because Google Fit returns meters when we want km
 	return response / 1000, nil
 }
@@ -140,16 +124,11 @@ func (g Google) GetDistanceOverPeriod(userID int, date time.Time, period string)
 		return 0, err
 	}
 
-	//if response == nil {
-	//	return 0, nil
-	//}
-
 	// To prevent dividing by 0
 	if response == 0 {
 		return 0, nil
 	}
 
-	//floatValue := response[0]["fpVal"]
 	// Divide the result by 1000, because Google Fit returns meters when we want km
 	return response / 1000, nil
 }
@@ -184,14 +163,19 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 
 	UnixTimeDateInt := date.UnixNano() / 1000000
 
+	var bucketByTime = make(map[string]int64)
+
 	var UnixTimeLimit int64
 	// If the user only entered the date, just add the amount of milliseconds in a day to the time limit
 	if period == "" {
 		UnixTimeLimit = UnixTimeDateInt + millisecondsInADay
+		bucketByTime["durationMillis"] = millisecondsInADay
 	} else {
 		// Get the appropriate amount of milliseconds from the map
 		if millisecondValue, ok := periodToMilliseconds[period]; ok {
 			UnixTimeLimit = UnixTimeDateInt + millisecondValue
+
+			bucketByTime["durationMillis"] = UnixTimeLimit - UnixTimeDateInt
 		} else {
 			// Something went wrong, we are only supposed to get valid periods from earlier in the call layer
 			g.log.WithFields(logrus.Fields{
@@ -208,10 +192,6 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 	dataSourceMap := make(map[string]string)
 	dataSourceMap["dataSourceId"] = dataSourceID
 	aggregateBy[0] = dataSourceMap
-
-	var bucketByTime = make(map[string]int64)
-
-	bucketByTime["durationMillis"] = millisecondsInADay
 
 	// Need to create the request body
 	requestBody, err := json.Marshal(GoogleFitRequest{
@@ -296,13 +276,4 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 		}
 	}
 	return result, nil
-
-	/*
-		// The data source might be empty, if the user doesn't have fitness data for that day of this type
-		if len(responseValue.Buckets[0].Datasets[0].Points) < 1 {
-			return nil, nil
-		}
-
-		return responseValue.Buckets[0].Datasets[0].Points[0].Values, nil
-	*/
 }
