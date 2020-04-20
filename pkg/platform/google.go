@@ -83,81 +83,92 @@ func (g Google) Name() string {
 }
 
 func (g Google) GetSteps(userID int, date time.Time) (int, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedStepsID, "")
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedStepsID, "intVal", "")
 	if err != nil {
 		return 0, err
 	}
 
-	if response == nil {
-		return 0, nil
-	}
+	//if response == nil {
+	//	return 0, nil
+	//}
 
-	intValue := response[0]["intVal"]
+	//intValue := response[0]["intVal"]
 	// Google gives the value back as a float, but it can be parsed as an int
-	return int(intValue.(float64)), nil
-
+	//return int(intValue.(float64)), nil
+	return int(response), nil
 }
 
 func (g Google) GetCalories(userID int, date time.Time) (int, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedCaloriesID, "")
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedCaloriesID, "fpVal", "")
 
 	if err != nil {
 		return 0, err
 	}
 	// Get the value from the response
-	if response == nil {
-		return 0, nil
-	}
+	//if response == nil {
+	//	return 0, nil
+	//}
 
-	intValue := response[0]["fpVal"]
-	return int(intValue.(float64)), nil
+	//intValue := response[0]["fpVal"]
+
+	return int(response), nil
 }
 
 func (g Google) GetDistance(userID int, date time.Time) (float64, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, "")
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, "fpVal", "")
 	if err != nil {
 		return 0, err
 	}
 
-	if response == nil {
+	//if response == nil {
+	//	return 0, nil
+	//}
+
+	// To prevent dividing by 0
+	if response == 0 {
 		return 0, nil
 	}
 
-	floatValue := response[0]["fpVal"]
+	//floatValue := response[0]["fpVal"]
 	// Divide the result by 1000, because Google Fit returns meters when we want km
-	return floatValue.(float64) / 1000, nil
+	return response / 1000, nil
 }
 
 func (g Google) GetDistanceOverPeriod(userID int, date time.Time, period string) (float64, error) {
-	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, period)
+	response, err := g.makeGoogleFitRequest(userID, date, aggregatedDistanceID, "fpVal", period)
 	if err != nil {
 		return 0, err
 	}
 
-	if response == nil {
+	//if response == nil {
+	//	return 0, nil
+	//}
+
+	// To prevent dividing by 0
+	if response == 0 {
 		return 0, nil
 	}
 
-	floatValue := response[0]["fpVal"]
+	//floatValue := response[0]["fpVal"]
 	// Divide the result by 1000, because Google Fit returns meters when we want km
-	return floatValue.(float64) / 1000, nil
+	return response / 1000, nil
 }
 
-func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string, period string) (GoogleValuesResponse, error) {
+func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID string, valueName string, period string) (float64, error) {
 	// Get Access Token associated with user from db
 	tokens, err := dal.GetUserTokens(g.db, userID, g.Name())
 
 	// Before we can make the request, refresh the access tokens
 	newTokens, err := auth.RefreshOAuth2Tokens(tokens, g.authorization)
 	if err != nil {
-		return GoogleValuesResponse{}, err
+		return 0, err
 	}
 
 	if newTokens.AccessToken != tokens.AccessToken {
 		// Tokens were updated, let's update the database
 		err := dal.UpdateCredentialsUsingOAuth2Tokens(g.db, userID, newTokens)
 		if err != nil {
-			return GoogleValuesResponse{}, errors.New("failed to update db with new oauth2 tokens: " + err.Error())
+			return 0, errors.New("failed to update db with new oauth2 tokens: " + err.Error())
 		}
 
 		g.log.WithFields(logrus.Fields{
@@ -189,7 +200,7 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 				"function": "makeGoogleFitRequest",
 			}).Error("Improper period passed in")
 
-			return GoogleValuesResponse{}, errors.New("invalid period value")
+			return 0, errors.New("invalid period value")
 		}
 	}
 
@@ -219,7 +230,7 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 			"endTimeMillis":   UnixTimeLimit,
 		}).Error("failed to marshal google fit request")
 
-		return GoogleValuesResponse{}, err
+		return 0, err
 	}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(requestBody))
@@ -228,7 +239,7 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 			"error": err.Error(),
 		}).Error("failed to request data from Google Fit")
 
-		return GoogleValuesResponse{}, err
+		return 0, err
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
@@ -237,7 +248,7 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 			"error": err.Error(),
 		}).Error("failed to read response data from Google Fit")
 
-		return GoogleValuesResponse{}, nil
+		return 0, nil
 	}
 	_ = resp.Body.Close()
 
@@ -250,7 +261,7 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 			"responseBody": string(body),
 		}).Error("failed to unmarshal Google Fit response")
 
-		return GoogleValuesResponse{}, err
+		return 0, err
 	}
 
 	// First, check if there was an error in the response
@@ -260,14 +271,38 @@ func (g Google) makeGoogleFitRequest(userID int, date time.Time, dataSourceID st
 			"code":         responseValue.Error.Code,
 			"responseBody": string(body),
 		}).Error("received bad response from Google Fit")
-		return nil, nil
+		return 0, nil
 	}
 
-	// The data source might be empty, if the user doesn't have fitness data for that day of this type
-	if len(responseValue.Buckets[0].Datasets[0].Points) < 1 {
-		return nil, nil
+	result := 0.0
+
+	for _, currentBucket := range responseValue.Buckets {
+
+		if len(currentBucket.Datasets) < 1 {
+			continue
+		}
+
+		for _, currentDataSet := range currentBucket.Datasets {
+
+			// if the currentData set is empty, continue
+			if len(currentDataSet.Points) < 1 {
+				continue
+			}
+
+			for _, currentPoint := range currentDataSet.Points {
+				// Add the result to the total
+				result += currentPoint.Values[0][valueName].(float64)
+			}
+		}
 	}
+	return result, nil
 
-	return responseValue.Buckets[0].Datasets[0].Points[0].Values, nil
+	/*
+		// The data source might be empty, if the user doesn't have fitness data for that day of this type
+		if len(responseValue.Buckets[0].Datasets[0].Points) < 1 {
+			return nil, nil
+		}
 
+		return responseValue.Buckets[0].Datasets[0].Points[0].Values, nil
+	*/
 }
