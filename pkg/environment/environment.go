@@ -9,16 +9,16 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// MarathonConfig is the overall structure that will contain our environment configs for the marathon service
-type MarathonConfig struct {
+// MrthnConfig is the overall structure that will contain our environment configs for the mrthn service
+type MrthnConfig struct {
 	Server             serverConfig
 	DBConnectionString string
 	Fitbit             platformConfig
 	Google             platformConfig
 	Strava             platformConfig
 	Callback           string        // This will be the callback for all services. If we need multiple, this may need to change
-	ClientTimeout      time.Duration // The timeout for the client that is used to make requests for Marathon
-	MarathonWebsiteURL string        // We will only accept client SignUp requests if it comes from the Marathon website
+	ClientTimeout      time.Duration // The timeout for the client that is used to make requests for mrthn
+	MrthnWebsiteURL    string        // We will only accept client SignUp requests if it comes from the mrthn website
 }
 
 // Server config options
@@ -36,9 +36,9 @@ type platformConfig struct {
 }
 
 // ReadEnvFile takes the environment variables, and puts them all into an EnvironmentConfig struct
-func ReadEnvFile(env string) (*MarathonConfig, error) {
+func ReadEnvFile(env string) (*MrthnConfig, error) {
 	// Create the Environment Config struct we will return to the user
-	setConfig := MarathonConfig{}
+	setConfig := MrthnConfig{}
 
 	if env == "development" {
 		// Set environment vars using .env file
@@ -55,12 +55,12 @@ func ReadEnvFile(env string) (*MarathonConfig, error) {
 	}
 	setConfig.Callback = callbackUrl
 
-	// Get the Marathon URL
-	marathonURL := os.Getenv("MARATHON_WEBSITE_URL")
-	if marathonURL == "" {
-		return nil, errors.New("environment variable MARATHON_WEBSITE_URL is not set")
+	// Get the mrthn URL
+	mrthnURL := os.Getenv("MRTHN_WEBSITE_URL")
+	if mrthnURL == "" {
+		return nil, errors.New("environment variable MRTHN_WEBSITE_URL is not set")
 	}
-	setConfig.MarathonWebsiteURL = marathonURL
+	setConfig.MrthnWebsiteURL = mrthnURL
 
 	// Get the client timeout
 	clientTimeout, err := strconv.Atoi(os.Getenv("CLIENT_TIMEOUT"))

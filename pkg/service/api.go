@@ -1,5 +1,5 @@
 /*
- * Marathon API
+ * mrthn API
  *
  * One login for all your fitness data needs.
  *
@@ -22,11 +22,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	"github.com/msgurgel/marathon/pkg/auth"
-	"github.com/msgurgel/marathon/pkg/dal"
-	"github.com/msgurgel/marathon/pkg/helpers"
-	"github.com/msgurgel/marathon/pkg/model"
-	"github.com/msgurgel/marathon/pkg/platform"
+	"github.com/msgurgel/mrthn/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/helpers"
+	"github.com/msgurgel/mrthn/pkg/model"
+	"github.com/msgurgel/mrthn/pkg/platform"
 )
 
 type verifiedParams struct {
@@ -47,7 +47,7 @@ type Api struct {
 
 var allowedPeriods = []string{"1d", "7d", "30d", "1w", "1m", "3m", "6m"}
 
-// paramsMapRegular is used for most calls to the Marathon API
+// paramsMapRegular is used for most calls to the mrthn API
 var paramsMapRegular = map[string]bool{
 	"userID":      true,
 	"date":        true,
@@ -959,7 +959,7 @@ func (api *Api) createUser(Oauth2Params *auth.OAuth2Result) (int, error) {
 	}
 
 	if userID != 0 {
-		// This user already exists in the Marathon User table.
+		// This user already exists in the mrthn User table.
 
 		// Update their credentials, since they logged in again
 		err = dal.UpdateCredentialsUsingOAuth2Tokens(api.db, userID, Oauth2Params.Token)
@@ -984,7 +984,7 @@ func (api *Api) createUser(Oauth2Params *auth.OAuth2Result) (int, error) {
 			return userID, nil
 		}
 
-		// The user already exists both in Marathon, and in the client's userbase.
+		// The user already exists both in mrthn, and in the client's userbase.
 		// What are we doing here? It's over. Go home.
 		return userID, nil
 	}
@@ -1069,7 +1069,7 @@ func (api *Api) respondWithJSON(w http.ResponseWriter, code int, payload interfa
 	return err
 }
 
-func checkMarathonURL(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
+func checkMrthnURL(log *logrus.Logger, next http.Handler, allowedOrigin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		originHeader := r.Header.Get("Origin")
 
@@ -1094,7 +1094,7 @@ func checkMarathonURL(log *logrus.Logger, next http.Handler, allowedOrigin strin
 			return
 		}
 
-		// Call was made from Marathon Website, call the next middleware
+		// Call was made from mrthn Website, call the next middleware
 		next.ServeHTTP(w, r)
 	})
 }

@@ -4,7 +4,7 @@ set -e # Any subsequent(*) commands which fail will cause the shell script to ex
 # ======= BEFORE RUNNING THIS SCRIPT =======
 # 1. Make sure to run 'bundle install' on the both ruby app directories (integration/sandwich & integration/sandwich/server)
 # 2. Set your Postgres env vars in setup-db-env-var.sh.example file and remove .example from the file name
-# 3. Run this script from marathon's home directory ($GOPATH/src/github.com/msgurgel/marathon) using the following command:
+# 3. Run this script from mrthn's home directory ($GOPATH/src/github.com/msgurgel/mrthn) using the following command:
 #   ./integration/integration-test.sh
 
 # Get database environment values
@@ -17,10 +17,10 @@ mkdir -p log
 psql -a $DB_CONNECTION_STRING -f integration/sql/clear-db.sql > log/db_script.log
 psql -a $DB_CONNECTION_STRING -f integration/sql/setup-db.sql > log/db_script.log
 
-# Build and run Marathon
-go build "$GOPATH"/src/github.com/msgurgel/marathon/cmd/marathon
-./marathon &
-MARATHON_PID=$!
+# Build and run mrthn
+go build "$GOPATH"/src/github.com/msgurgel/mrthn/cmd/mrthn
+./mrthn &
+MRTHN_PID=$!
 
 sleep 1 # Give the server time to start
 
@@ -40,10 +40,10 @@ ruby integration/sandwich/sandwich_test.rb || true
 
 
 # Exit cleanly
-kill -2 $MARATHON_PID
+kill -2 $MRTHN_PID
 kill -2 $SERVER_PID
 
-rm ./marathon
+rm ./mrthn
 rm ./token.txt
 
 # Clear database

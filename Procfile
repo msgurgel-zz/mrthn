@@ -1,1 +1,1 @@
-web: bin/marathon -log-to-stderr -env production
+web: bin/mrthn -log-to-stderr -env production

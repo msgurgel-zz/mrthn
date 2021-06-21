@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/helpers"
+	"github.com/msgurgel/mrthn/pkg/helpers"
 
-	"github.com/msgurgel/marathon/pkg/dal"
-	"github.com/msgurgel/marathon/pkg/platform"
+	"github.com/msgurgel/mrthn/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/platform"
 
 	"github.com/sirupsen/logrus"
 )
