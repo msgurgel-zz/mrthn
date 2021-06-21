@@ -63,7 +63,7 @@ To run this service or its integration tests, you will need to set up a db insta
 ```
 
 4. Set environment variables. See [Environment Variables](#environment-variables) section.
-
+5. Set up your database. See [Database Set Up](#database-set-up) section.
 
 5. Compile the code
 
