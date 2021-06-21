@@ -3,7 +3,7 @@ set -e # Any subsequent(*) commands which fail will cause the shell script to ex
 
 # ======= BEFORE RUNNING THIS SCRIPT =======
 # 1. Make sure to run 'bundle install' on the both ruby app directories (integration/sandwich & integration/sandwich/server)
-# 2. Set your Postgres env vars in setup-db-env-var.sh.example file and remove .example from the file name
+# 2. Set your Postgres env vars in .env.example file and remove .example from the file name
 # 3. Run this script from mrthn's home directory ($GOPATH/src/github.com/msgurgel/mrthn) using the following command:
 #   ./integration/integration-test.sh
 
@@ -25,7 +25,7 @@ MRTHN_PID=$!
 sleep 1 # Give the server time to start
 
 # Generate JWT for authentication
-curl -s "http://localhost:8080/get-token?id=1" -H "Origin: https://mrthn.dev"> token.txt
+curl -s "http://localhost:$PORT/get-token?id=1" -H "Origin: https://mrthn.dev"> token.txt
 
 # Run mock third-party server
 rackup integration/sandwich/server/config.ru > log/test-server.log 2>&1 &
