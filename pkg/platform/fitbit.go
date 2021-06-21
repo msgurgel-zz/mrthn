@@ -10,15 +10,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/auth"
 
 	"golang.org/x/oauth2"
 
-	"github.com/msgurgel/marathon/pkg/helpers"
+	"github.com/msgurgel/mrthn/pkg/helpers"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/msgurgel/marathon/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/dal"
 )
 
 // ResourceEndpoint contains endpoint for any type of resource we want to access from Fitbit

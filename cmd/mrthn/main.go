@@ -1,5 +1,5 @@
 /*
- * Marathon API
+ * mrthn API
  *
  * One login for all your fitness data needs.
  *
@@ -16,14 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/platform"
+	"github.com/msgurgel/mrthn/pkg/platform"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/msgurgel/marathon/pkg/auth"
-	"github.com/msgurgel/marathon/pkg/dal"
-	"github.com/msgurgel/marathon/pkg/environment"
-	"github.com/msgurgel/marathon/pkg/service"
+	"github.com/msgurgel/mrthn/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/environment"
+	"github.com/msgurgel/mrthn/pkg/service"
 )
 
 func main() {
@@ -80,7 +80,7 @@ func main() {
 	platform.InitializePlatforms(db, log, authTypes)
 
 	// Setup Router
-	router := service.NewRouter(db, log, authTypes, env.MarathonWebsiteURL)
+	router := service.NewRouter(db, log, authTypes, env.MrthnWebsiteURL)
 
 	// Prepare the server
 	srv := &http.Server{

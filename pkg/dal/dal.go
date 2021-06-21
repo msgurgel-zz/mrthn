@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/helpers"
+	"github.com/msgurgel/mrthn/pkg/helpers"
 
 	"golang.org/x/oauth2"
 

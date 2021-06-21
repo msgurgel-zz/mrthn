@@ -1,5 +1,5 @@
 /*
- * Marathon API
+ * mrthn API
  *
  * One login for all your fitness data needs.
  *
@@ -8,7 +8,7 @@
 package service
 
 import (
-	"github.com/msgurgel/marathon/pkg/model"
+	"github.com/msgurgel/mrthn/pkg/model"
 )
 
 type GetValueResponse struct {

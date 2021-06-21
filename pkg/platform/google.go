@@ -9,8 +9,8 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/auth"
-	"github.com/msgurgel/marathon/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/dal"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"

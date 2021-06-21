@@ -1,4 +1,4 @@
-module github.com/msgurgel/marathon
+module github.com/msgurgel/mrthn
 
 go 1.13
 

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/auth"
-	"github.com/msgurgel/marathon/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/dal"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -76,7 +76,7 @@ func (s Strava) GetDistance(userID int, date time.Time) (float64, error) {
 		return 0, err
 	}
 
-	// Marathon returns distances in kilometres, not meters
+	// mrthn returns distances in kilometres, not meters
 	kilometerValue := dailyAct.totalDistance / 1000
 
 	return kilometerValue, nil
@@ -88,7 +88,7 @@ func (s Strava) GetDistanceOverPeriod(userID int, date time.Time, period string)
 		return 0, err
 	}
 
-	// Marathon returns distances in kilometers, not meters
+	// mrthn returns distances in kilometers, not meters
 	kilometerValue := activityStats.totalDistance / 1000
 
 	return kilometerValue, nil

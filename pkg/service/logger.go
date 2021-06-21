@@ -1,5 +1,5 @@
 /*
- * Marathon API
+ * mrthn API
  *
  * One login for all your fitness data needs.
  *
@@ -23,7 +23,7 @@ func SetupLogger(logToStderr bool) *logrus.Logger {
 		// Create file to store logs
 		logDir := filepath.Join(".", "log")
 		_ = os.MkdirAll(logDir, 0700)
-		file, err := os.OpenFile("log/marathon.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		file, err := os.OpenFile("log/mrthn.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err == nil {
 			logger.Out = file
 		} else {

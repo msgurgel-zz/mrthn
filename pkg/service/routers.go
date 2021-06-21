@@ -1,5 +1,5 @@
 /*
- * Marathon API
+ * mrthn API
  *
  * One login for all your fitness data needs.
  *
@@ -11,7 +11,7 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/msgurgel/marathon/pkg/auth"
+	"github.com/msgurgel/mrthn/pkg/auth"
 
 	"github.com/rs/cors"
 
@@ -24,13 +24,13 @@ type Route struct {
 	Method              string
 	Pattern             string
 	Secure              bool
-	MarathonWebsiteOnly bool
+	MrthnWebsiteOnly    bool
 	HandlerFunc         http.HandlerFunc
 }
 
 type Routes []Route
 
-func NewRouter(db *sql.DB, logger *logrus.Logger, authTypes auth.Types, marathonWebsiteURL string) *mux.Router {
+func NewRouter(db *sql.DB, logger *logrus.Logger, authTypes auth.Types, mrthnWebsiteURL string) *mux.Router {
 	routes := prepareRoutes(db, logger, authTypes)
 	router := mux.NewRouter().StrictSlash(true)
 
@@ -44,9 +44,9 @@ func NewRouter(db *sql.DB, logger *logrus.Logger, authTypes auth.Types, marathon
 			handler = jwtMiddleware(db, logger, handler)
 		}
 
-		// Check Marathon Website Origin Middleware
-		if route.MarathonWebsiteOnly {
-			handler = checkMarathonURL(logger, handler, marathonWebsiteURL)
+		// Check mrthn Website Origin Middleware
+		if route.MrthnWebsiteOnly {
+			handler = checkMrthnURL(logger, handler, mrthnWebsiteURL)
 		}
 
 		// CORS Middleware

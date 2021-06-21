@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/msgurgel/marathon/pkg/environment"
+	"github.com/msgurgel/mrthn/pkg/environment"
 	"golang.org/x/oauth2/endpoints"
 
 	"golang.org/x/oauth2"
@@ -62,7 +62,7 @@ type UserProfileResponse struct {
 	HistoryID     string `json:"historyId,omitempty"`
 }
 
-func NewOAuth2(configs *environment.MarathonConfig) OAuth2 {
+func NewOAuth2(configs *environment.MrthnConfig) OAuth2 {
 	requestClient := &http.Client{
 		Timeout: 10 * time.Second, // TODO: Make this an environment variable
 	}
@@ -218,7 +218,7 @@ func RefreshOAuth2Tokens(tokens *oauth2.Token, conf *oauth2.Config) (*oauth2.Tok
 	return newTokens, nil
 }
 
-func initializeOAuth2Map(configs *environment.MarathonConfig) map[string]*oauth2.Config {
+func initializeOAuth2Map(configs *environment.MrthnConfig) map[string]*oauth2.Config {
 	OAuthConfigs := make(map[string]*oauth2.Config)
 
 	// Initialize all platforms OAuth2 configs

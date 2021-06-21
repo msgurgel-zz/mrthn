@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/msgurgel/marathon/pkg/dal"
+	"github.com/msgurgel/mrthn/pkg/dal"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
@@ -24,7 +24,7 @@ func generateJWT(clientID int, secret []byte) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		// TODO: Make client ID not an integer
 		Audience: strconv.Itoa(clientID),
-		Issuer:   "Marathon",
+		Issuer:   "mrthn",
 	})
 
 	// TODO: Add expiration to the token
