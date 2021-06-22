@@ -1,7 +1,7 @@
 
 # mrthn
 
-mrthn is a service that allows you to aggregate the data from multiple Fitness App APIs into simple endpoints. Currently, it supports Google Fitness, Strava, and Fitbit.
+mrthn (pronounced marathon) is a service that allows you to aggregate the data from multiple Fitness App APIs into simple endpoints. Currently, it supports Google Fitness, Strava, and Fitbit.
 
 [![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/tterb/atomic-design-ui/blob/master/LICENSEs)
 
